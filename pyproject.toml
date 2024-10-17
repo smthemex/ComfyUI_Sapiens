@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_sapiens"
+description = "You can call Using Sapiens to get seg，normal，pose，depth，mask."
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["#torch", "#torchvision", "#opencv-python", "#cap_from_youtube", "#imread_from_url", "ultralytics", "#huggingface_hub"]
+
+[project.urls]
+Repository = "https://github.com/smthemex/ComfyUI_Sapiens"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "smthemex"
+DisplayName = "ComfyUI_Sapiens"
+Icon = ""
