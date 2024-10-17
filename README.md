@@ -1,5 +1,5 @@
 # ComfyUI_Sapiens
-You can call Using Sapiens to get seg，normal，pose，depth，mask.
+You can call Using Sapiens to get seg,normal,pose,depth,mask maps.
 
 Sapiens From: [facebookresearch/sapiens](https://github.com/facebookresearch/sapiens) 
 
@@ -14,7 +14,7 @@ git clone https://github.com/smthemex/ComfyUI_Sapiens
 ```
 pip install -r requirements.txt
 ```
-If some module is missing, please pip install   #ultralytics yolov8
+If some modules missing, please pip install   #ultralytics yolov8
 
 3.checkpoints 
 ----
@@ -48,7 +48,7 @@ yolo是pose必须的，官方的太复杂，不如yolo好用；
 
 Citation
 ------
-* Using some ibaiGorordo's code from [ibaiGorordo](https://github.com/ibaiGorordo/Sapiens-Pytorch-Inference)  
+* Using some ibaiGorordo's codes from [ibaiGorordo](https://github.com/ibaiGorordo/Sapiens-Pytorch-Inference)  
 * UsingJaykumaran's codes from [Jaykumaran](https://learnopencv.com/sapiens-human-vision-models)  
 **facebookresearch/sapiens**
 ``` python  
