@@ -16,7 +16,7 @@ pip install -r requirements.txt
 ```
 If some module is missing, please pip install   #ultralytics yolov8
 
-3 Need  model 
+3.checkpoints 
 ----
 **3.1 base :(choice repo_id or ckpt_name)**       
 * 3.1.1 #sapiens    
@@ -43,13 +43,13 @@ yolo是pose必须的，官方的太复杂，不如yolo好用；
 4 Example
 ----
 **seg body**    
-* 最新示例，可以选人体部位28种类型 （Latest version)        
+* 可以选人体部位27种类型 （Latest version)        
 ![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example.png)   
 
 Citation
 ------
 * Using some ibaiGorordo's code from [ibaiGorordo](https://github.com/ibaiGorordo/Sapiens-Pytorch-Inference)  
-* UsingJaykumaran's codes from [Jaykumaran](https://learnopencv.com/sapiens-human-vision-models/）
+* UsingJaykumaran's codes from [Jaykumaran](https://learnopencv.com/sapiens-human-vision-models)  
 **facebookresearch/sapiens**
 ``` python  
 @article{khirodkar2024sapiens,
