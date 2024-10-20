@@ -86,7 +86,7 @@ class SapiensPoseEstimation:
             cropped_img = self.crop_image(img, bbox)
             tensor = self.preprocessor(cropped_img).unsqueeze(0).to(self.device).to(self.dtype)
 
-            heatmaps = self.model(tensor)
+            heatmaps = self.model(tensor).to(torch.float32)
             keypoints = self.heatmaps_to_keypoints(heatmaps[0].cpu().numpy())
             all_keypoints.append(keypoints)
             if not self.show_pose_object:

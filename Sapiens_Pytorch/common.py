@@ -53,8 +53,8 @@ class ImageProcessor:
                                  std=[58.5 / 255, 57.0 / 255, 57.5 / 255]),
         ])
     
-    def process_image(self, image: Image.Image, model,select_obj,RGB_BG):
-        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda")
+    def process_image(self, image: Image.Image, model,select_obj,RGB_BG, model_dtype: torch.dtype = torch.float32):
+        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda").to(model_dtype)
         preds = ModelManager.run_model(model, input_tensor, image.height, image.width)
         mask = preds.squeeze(0).cpu().numpy()
         
@@ -104,10 +104,10 @@ class ImageProcessorDepth:
         ])
     
 
-    def process_image(self, image: Image.Image, depth_model, if_seg,seg_in,RGB_BG):
+    def process_image(self, image: Image.Image, depth_model, if_seg,seg_in,RGB_BG, model_dtype: torch.dtype = torch.float32):
 
-        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda")
-        depth_output = ModelManager.run_model_depth(depth_model, input_tensor, image.height, image.width)
+        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda").to(model_dtype)
+        depth_output = ModelManager.run_model_depth(depth_model, input_tensor, image.height, image.width).to(torch.float32)
         depth_map = depth_output.squeeze().cpu().numpy()
         
         if if_seg:
@@ -142,12 +142,13 @@ class ImageProcessorNormal:
             transforms.Normalize(mean=[123.5/255, 116.5/255, 103.5/255], std=[58.5/255, 57.0/255, 57.5/255]),
         ])
 
-    def process_image(self, image: Image.Image, normal_model, if_seg,seg_in,RGB_BG):
+    def process_image(self, image: Image.Image, normal_model, if_seg,seg_in,RGB_BG, model_dtype: torch.dtype = torch.float32):
         # Load models here instead of storing them as class attributes
-        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda")
+        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda").to(model_dtype)
 
         # Run normal estimation
-        normal_output = ModelManager.run_model(normal_model, input_tensor, image.height, image.width)
+        normal_output = ModelManager.run_model_depth(normal_model, input_tensor, image.height, image.width).to(torch.float32)
+
         normal_map = normal_output.squeeze().cpu().numpy().transpose(1, 2, 0)
 
         # Create a copy of the normal map for visualization
