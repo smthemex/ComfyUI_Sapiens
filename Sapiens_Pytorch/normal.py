@@ -113,6 +113,6 @@ class NormalSapiens():
     def __call__(self, image, if_seg, seg_in,RGB_BG):
         start = time.perf_counter()
         with torch.inference_mode():
-            result = self.image_processor.process_image(image, self.model, if_seg, seg_in,RGB_BG)
+            result = self.image_processor.process_image(image, self.model, if_seg, seg_in,RGB_BG, model_dtype=self.dtype)
         print(f"Normal inference took: {time.perf_counter() - start:.4f} seconds")
         return result

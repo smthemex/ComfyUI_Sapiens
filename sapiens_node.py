@@ -48,7 +48,7 @@ class SapiensLoader:
                 "depth_ckpt": (["none"]+ckpt_list_filter,),
                 "normal_ckpt": (["none"]+ckpt_list_filter,),
                 "pose_ckpt": (["none"] + ckpt_list_filter,),
-                "dtype": (["float32_torch","float32", "bfloat16",],),
+                "dtype": (["float32_torch","bf16_torch","float32", "bfloat16",],),
                 "minimum_person_height": ("FLOAT", {
                     "default": 0.5,
                     "min": 0.0,
@@ -61,6 +61,7 @@ class SapiensLoader:
                 "use_yolo":("BOOLEAN", {"default": False},),
                 "show_pose_object": ("BOOLEAN", {"default": False},),
                 "seg_pellete":("BOOLEAN", {"default": True},),
+                "convert_torchscript_to_bf16":("BOOLEAN", {"default": False},),  # currently only for TorchScript models
             },
         }
 
@@ -69,7 +70,7 @@ class SapiensLoader:
     FUNCTION = "loader_main"
     CATEGORY = "Sapiens"
 
-    def loader_main(self, seg_ckpt,depth_ckpt,normal_ckpt,pose_ckpt,dtype,minimum_person_height,remove_background,use_yolo,show_pose_object,seg_pellete):
+    def loader_main(self, seg_ckpt,depth_ckpt,normal_ckpt,pose_ckpt,dtype,minimum_person_height,remove_background,use_yolo,show_pose_object,seg_pellete,convert_torchscript_to_bf16):
         
         config = SapiensConfig()
         config.model_dir=weigths_current_path
@@ -83,12 +84,37 @@ class SapiensLoader:
             config.dtype=torch.bfloat16
         elif dtype=="float32_torch":
             config.dtype = torch.float32
+        elif dtype=="bf16_torch":
+            config.dtype = torch.bfloat16
         else:
             config.dtype = torch.float32
             
         config.minimum_person_height=minimum_person_height
         config=get_models_path(seg_ckpt, depth_ckpt, normal_ckpt,pose_ckpt, config,dtype)
-        
+
+        # currently only for TorchScript models, convert selected FP32 TorchScript Sapiens models to BF16, save them and use them
+        if convert_torchscript_to_bf16:
+            print("converting TorchScript Sapiens models to BF16...")
+            for model_path_attr in ("local_seg_path", "local_depth_path", "local_normal_path", "local_pose_path"):
+                model_path = getattr(config, model_path_attr)
+                if len(model_path) and model_path.endswith("torchscript.pt2"):
+                    model_split_path = os.path.splitext(model_path)
+                    converted_model_path = model_split_path[0] + "_bf16" + model_split_path[1]
+
+                    print(f'converting "{model_path}" to BF16...')
+                    if os.path.exists(converted_model_path):
+                        print(f'"{converted_model_path}" already exists, not converting...')
+                    else:
+                        model = torch.jit.load(model_path)
+                        model.eval().to("cuda").to(torch.bfloat16)
+                        torch.jit.save(model, converted_model_path)
+
+                        print(f'"{model_path}" converted to BF16 "{converted_model_path}"')
+
+                    setattr(config, model_path_attr, converted_model_path)
+
+            config.dtype = torch.bfloat16
+
         model = SapiensPredictor(config)
         return (model,)
     
@@ -187,8 +213,8 @@ class SapiensSampler:
         pose_img = load_images(pose_list) if pose_list else zero_tensor
         mask = torch.cat(mask_list,dim=0) if mask_list else torch.zeros((64,64), dtype=torch.float32, device="cpu")
         return (seg_img, depth_img,normal_img, pose_img, mask)
-        
-       
+
+
 
 NODE_CLASS_MAPPINGS = {
     "SapiensLoader": SapiensLoader,

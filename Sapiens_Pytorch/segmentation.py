@@ -122,7 +122,8 @@ class SapiensSeg():
     def __call__(self, image,select_obj,RGB_BG) :
         start = time.perf_counter()
         with torch.inference_mode():
-            result, mask,seg_pred = self.image_processor.process_image(image, self.model,select_obj,RGB_BG)
+            # result, mask,seg_pred = self.image_processor.process_image(image, self.model,select_obj,RGB_BG)
+            result, mask,seg_pred = self.image_processor.process_image(image, self.model,select_obj,RGB_BG, model_dtype=self.dtype)
         print(f"Segmentation inference took: {time.perf_counter() - start:.4f} seconds")
         return result, mask,seg_pred
 
