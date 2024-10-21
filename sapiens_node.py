@@ -42,12 +42,16 @@ class SapiensLoader:
     @classmethod
     def INPUT_TYPES(s):
         ckpt_list_filter=[i for i in folder_paths.get_filename_list("sapiens") if i.endswith(".pth") or i.endswith(".pt2")]
+        ckpt_list_seg=[i for i in ckpt_list_filter if "seg" in i]
+        ckpt_list_depth = [i for i in ckpt_list_filter if "depth" in i]
+        ckpt_list_normal= [i for i in ckpt_list_filter if "normal" in i]
+        ckpt_list_pose= [i for i in ckpt_list_filter if "pose" in i]
         return {
             "required": {
-                "seg_ckpt": (["none"]+ckpt_list_filter,),
-                "depth_ckpt": (["none"]+ckpt_list_filter,),
-                "normal_ckpt": (["none"]+ckpt_list_filter,),
-                "pose_ckpt": (["none"] + ckpt_list_filter,),
+                "seg_ckpt": (["none"]+ckpt_list_seg,),
+                "depth_ckpt": (["none"]+ckpt_list_depth,),
+                "normal_ckpt": (["none"]+ ckpt_list_normal,),
+                "pose_ckpt": (["none"] + ckpt_list_pose,),
                 "dtype": (["float32_torch","bf16_torch","float32", "bfloat16",],),
                 "minimum_person_height": ("FLOAT", {
                     "default": 0.5,
@@ -160,6 +164,9 @@ class SapiensSampler:
     CATEGORY = "Sapiens"
     
     def sampler_main(self, model,image,seg_select,add_seg_index,BG_R,BG_G,BG_B):
+        if not  torch.backends.mps.is_available():
+           model.move_to_cuda()
+        
         RGB_BG=[BG_R,BG_G,BG_B]
         
         #select body index"
@@ -173,8 +180,11 @@ class SapiensSampler:
             
         else:
             seg_select=[]
-            
-        print(f"Select seg part of {seg_select} ")
+        
+        seg_select_all=[list(GOLIATH_CLASSES_FIX)[i] for i in seg_select] if seg_select else "seg default hunman map."
+        
+        print(f"Select seg part of {seg_select_all} ")
+        
         model.select=seg_select
         
         b,_,_,_=image.size()
@@ -212,6 +222,7 @@ class SapiensSampler:
         depth_img = load_images(depth_list) if depth_list else zero_tensor
         pose_img = load_images(pose_list) if pose_list else zero_tensor
         mask = torch.cat(mask_list,dim=0) if mask_list else torch.zeros((64,64), dtype=torch.float32, device="cpu")
+        model.enable_model_cpu_offload()
         return (seg_img, depth_img,normal_img, pose_img, mask)
 
 

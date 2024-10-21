@@ -1,4 +1,5 @@
-
+# !/usr/bin/env python
+# -*- coding: UTF-8 -*-
 from dataclasses import dataclass
 import cv2
 import numpy as np
@@ -67,8 +68,7 @@ def expand_boxes(boxes: np.ndarray, img_shape: tuple[int, int], padding: int = 5
         y2 = min(img_shape[0], y2 + padding)
         expanded_boxes.append([x1, y1, x2, y2])
     return np.array(expanded_boxes)
-# !/usr/bin/env python
-# -*- coding: UTF-8 -*-
+
 class SapiensPredictor:
     def __init__(self, config: SapiensConfig):
         self.has_normal = config.normal_type != SapiensNormalType.OFF
@@ -97,22 +97,62 @@ class SapiensPredictor:
         self.model_dir=config.model_dir
         
         self.normal_predictor = SapiensNormal(config.normal_type, self.local_normal ,self.pt_type,self.model_dir,self.img_size,self.use_torchscript_normal,config.device,
-                                              config.dtype) if self.has_normal else None
-        self.segmentation_predictor = SapiensSegmentation(config.segmentation_type,self.local_seg,self.pt_type,self.model_dir,self.img_size, self.use_torchscript_seg,config.device, config.dtype)if self.has_seg else None
+                                              config.dtype) if self.has_normal and not self.use_pellete else None
+        self.segmentation_predictor = SapiensSegmentation(config.segmentation_type,self.local_seg,self.pt_type,self.model_dir,self.img_size, self.use_torchscript_seg,config.device, config.dtype)if self.has_seg and not self.use_pellete else None
         
-        self.depth_predictor = SapiensDepth(config.depth_type, self.local_depth,self.pt_type,self.model_dir,self.img_size,self.use_torchscript_depth,config.device, config.dtype) if self.has_depth else None
+        self.depth_predictor = SapiensDepth(config.depth_type, self.local_depth,self.pt_type,self.model_dir,self.img_size,self.use_torchscript_depth,config.device, config.dtype) if self.has_depth and not self.use_pellete else None
         
         self.pose_predictor = SapiensPoseEstimation(config.pose_type, self.local_pose, self.pt_type, self.model_dir,
-                                            self.img_size, self.use_torchscript_pose,self.show_pose_object,config.device, config.dtype) if self.has_pose else None
+                                            self.img_size, self.use_torchscript_pose,self.show_pose_object,config.device, config.dtype) if self.has_pose  else None
         
-        self.seg_pred=SapiensSeg(config.segmentation_type,self.local_seg,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_seg else None
-        self.depth_pred =DepthSapiens(config.depth_type,self.local_depth,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_depth else None
-        self.normal_pred =NormalSapiens(config.normal_type,self.local_normal,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_normal else None
+        self.seg_pred=SapiensSeg(config.segmentation_type,self.local_seg,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_seg and self.use_pellete else None
+        self.depth_pred =DepthSapiens(config.depth_type,self.local_depth,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_depth  and self.use_pellete else None
+        self.normal_pred =NormalSapiens(config.normal_type,self.local_normal,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_normal and self.use_pellete else None
         
         self.detector = config.detector  #Detector(config.detector_config) #TODO: Cropping seems to make the results worse
 
     def __call__(self, img: np.ndarray,select_obj,RGB_BG) :
         return self.predict(img,select_obj,RGB_BG)
+
+    def enable_model_cpu_offload(self):
+        if self.has_seg:
+            if self.use_pellete:
+                self.seg_pred.enable_model_cpu_offload()
+            else:
+                self.segmentation_predictor.enable_model_cpu_offload()
+        if self.has_normal:
+            if self.use_pellete:
+                self.normal_pred.enable_model_cpu_offload()
+                
+            else:
+                self.normal_predictor.enable_model_cpu_offload()
+        if self.has_depth:
+            if self.use_pellete:
+                self.depth_pred.enable_model_cpu_offload()
+                
+            else:
+                self.depth_predictor.enable_model_cpu_offload()
+        if self.has_pose:
+            self.pose_predictor.enable_model_cpu_offload()
+
+    def move_to_cuda(self):
+        if self.has_seg:
+            if self.use_pellete:
+                self.seg_pred.move_to_cuda()
+            else:
+               self.segmentation_predictor.move_to_cuda()
+        if self.has_normal:
+            if self.use_pellete:
+                self.normal_pred.move_to_cuda()
+            else:
+                self.normal_predictor.move_to_cuda()
+        if self.has_depth:
+            if self.use_pellete:
+                self.depth_pred.move_to_cuda()
+            else:
+                self.depth_predictor.move_to_cuda()
+        if self.has_pose:
+            self.pose_predictor.move_to_cuda()
 
     def predict(self, img,select_obj,RGB_BG) :# PIL.Image or np.ndarray
         if self.use_pellete:

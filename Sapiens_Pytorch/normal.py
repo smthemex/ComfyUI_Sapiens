@@ -89,7 +89,12 @@ class SapiensNormal():
         normals = postprocess_normal(results, img.shape[:2])
         print(f"Normal inference took: {time.perf_counter() - start:.4f} seconds")
         return normals
-
+    
+    def enable_model_cpu_offload(self):
+        self.model.to("cpu")
+        torch.cuda.empty_cache()
+    def move_to_cuda(self):
+        self.model.to("cuda")
 
 class NormalSapiens():
     def __init__(self,
@@ -116,3 +121,10 @@ class NormalSapiens():
             result = self.image_processor.process_image(image, self.model, if_seg, seg_in,RGB_BG, model_dtype=self.dtype)
         print(f"Normal inference took: {time.perf_counter() - start:.4f} seconds")
         return result
+    
+    def enable_model_cpu_offload(self):
+        self.model.to("cpu")
+        torch.cuda.empty_cache()
+    
+    def move_to_cuda(self):
+        self.model.to("cuda")

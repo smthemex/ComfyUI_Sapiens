@@ -100,7 +100,14 @@ class SapiensSegmentation():
 
         print(f"Segmentation inference took: {time.perf_counter() - start:.4f} seconds")
         return segmentation_map
-
+    
+    def enable_model_cpu_offload(self):
+        self.model.to("cpu")
+        torch.cuda.empty_cache()
+        
+    def move_to_cuda(self):
+        self.model.to("cuda")
+    
 class SapiensSeg():
     def __init__(self,
                  type: SapiensSegmentationType = SapiensSegmentationType.SEGMENTATION_1B,local_seg="",pt_type="float32_torch",model_dir="",use_torchscript=True,
@@ -127,4 +134,9 @@ class SapiensSeg():
         print(f"Segmentation inference took: {time.perf_counter() - start:.4f} seconds")
         return result, mask,seg_pred
 
-
+    def enable_model_cpu_offload(self):
+        self.model.to("cpu")
+        torch.cuda.empty_cache()
+        
+    def move_to_cuda(self):
+        self.model.to("cuda")
