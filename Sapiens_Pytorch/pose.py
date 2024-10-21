@@ -75,7 +75,13 @@ class SapiensPoseEstimation:
 
         print(f"Pose estimation inference took: {time.perf_counter() - start:.4f} seconds")
         return pose_result_image, keypoints
-
+    
+    def enable_model_cpu_offload(self):
+        self.model.to("cpu")
+        torch.cuda.empty_cache()
+        
+    def move_to_cuda(self):
+        self.model.to("cuda")
 
     @torch.inference_mode()
     def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]]) -> (np.ndarray, List[dict]):
