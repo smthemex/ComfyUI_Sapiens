@@ -34,7 +34,7 @@ class SapiensPoseEstimationType(Enum):
 class SapiensPoseEstimation:
     def __init__(self,
                  type: SapiensPoseEstimationType = SapiensPoseEstimationType.POSE_ESTIMATION_03B, local_pose="",pt_type="float32_torch",model_dir="",img_size=(1024, 768),use_torchscript=True,show_pose_object=False,
-                 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"),
                  dtype: torch.dtype = torch.float32):
         # Load the model
         self.local_pose = local_pose
