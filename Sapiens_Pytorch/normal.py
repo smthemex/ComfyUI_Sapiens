@@ -51,7 +51,7 @@ def postprocess_normal(results: torch.Tensor, img_shape: tuple[int, int]) -> np.
 class SapiensNormal():
     def __init__(self,
                  type: SapiensNormalType = SapiensNormalType.NORMAL_03B,local_normal="",pt_type="float32_torch",model_dir="",img_size=(1024, 768),use_torchscript=True,
-                 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"),
                  dtype: torch.dtype = torch.float32):
         self.local_normal=local_normal
         self.model_dir = model_dir
@@ -106,7 +106,7 @@ class NormalSapiens():
         self.pt_type = pt_type
         self.use_torchscript = use_torchscript
         self.model_name = type
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         self.dtype = dtype
         self.image_processor = ImageProcessorNormal()
         if self.local_normal:
