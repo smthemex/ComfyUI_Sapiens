@@ -13,7 +13,7 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 from .classes_and_palettes import GOLIATH_PALETTE, GOLIATH_CLASSES
-
+device_ = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 class TaskType(Enum):
     DEPTH = "depth"
     NORMAL = "normal"
@@ -54,7 +54,7 @@ class ImageProcessor:
         ])
     
     def process_image(self, image: Image.Image, model,select_obj,RGB_BG, model_dtype: torch.dtype = torch.float32):
-        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda").to(model_dtype)
+        input_tensor = self.transform_fn(image).unsqueeze(0).to(device_).to(model_dtype)
         preds = ModelManager.run_model(model, input_tensor, image.height, image.width)
         mask = preds.squeeze(0).cpu().numpy()
         
@@ -105,8 +105,7 @@ class ImageProcessorDepth:
     
 
     def process_image(self, image: Image.Image, depth_model, if_seg,seg_in,RGB_BG, model_dtype: torch.dtype = torch.float32):
-
-        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda").to(model_dtype)
+        input_tensor = self.transform_fn(image).unsqueeze(0).to(device_).to(model_dtype)
         depth_output = ModelManager.run_model_depth(depth_model, input_tensor, image.height, image.width).to(torch.float32)
         depth_map = depth_output.squeeze().cpu().numpy()
         
@@ -144,7 +143,8 @@ class ImageProcessorNormal:
 
     def process_image(self, image: Image.Image, normal_model, if_seg,seg_in,RGB_BG, model_dtype: torch.dtype = torch.float32):
         # Load models here instead of storing them as class attributes
-        input_tensor = self.transform_fn(image).unsqueeze(0).to("cuda").to(model_dtype)
+        
+        input_tensor = self.transform_fn(image).unsqueeze(0).to(device_).to(model_dtype)
 
         # Run normal estimation
         normal_output = ModelManager.run_model_depth(normal_model, input_tensor, image.height, image.width).to(torch.float32)
