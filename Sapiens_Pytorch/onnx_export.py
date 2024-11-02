@@ -5,7 +5,7 @@ from .common import TaskType, download_hf_model
 from .segmentation import SapiensSegmentationType
 from .normal import SapiensNormalType
 from .depth import SapiensDepthType
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 model_type_dict = {
     "seg03b": (SapiensSegmentationType.SEGMENTATION_03B, TaskType.SEG),
