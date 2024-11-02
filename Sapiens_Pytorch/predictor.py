@@ -5,37 +5,40 @@ import cv2
 import numpy as np
 import torch
 from PIL import Image
-from .depth import SapiensDepth, SapiensDepthType, draw_depth_map,DepthSapiens
-from .segmentation import SapiensSegmentation, SapiensSegmentationType, draw_segmentation_map,SapiensSeg
-from .normal import SapiensNormal, SapiensNormalType, draw_normal_map,NormalSapiens
-from .pose import SapiensPoseEstimationType,SapiensPoseEstimation
+from .depth import SapiensDepth, SapiensDepthType, draw_depth_map, DepthSapiens
+from .segmentation import SapiensSegmentation, SapiensSegmentationType, draw_segmentation_map, SapiensSeg
+from .normal import SapiensNormal, SapiensNormalType, draw_normal_map, NormalSapiens
+from .pose import SapiensPoseEstimationType, SapiensPoseEstimation
 from .detector import Detector
 from .common import get_mask
+
+
 @dataclass
 class SapiensConfig:
     dtype: torch.dtype = torch.float32
-    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device: torch.device = torch.device(
+        "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     segmentation_type: SapiensSegmentationType = SapiensSegmentationType.OFF
     normal_type: SapiensNormalType = SapiensNormalType.OFF
     depth_type: SapiensDepthType = SapiensDepthType.OFF
     pose_type: SapiensPoseEstimationType = SapiensPoseEstimationType.OFF
-    #detector_config: DetectorConfig = DetectorConfig()
+    # detector_config: DetectorConfig = DetectorConfig()
     minimum_person_height: int = 0.5  # 50% of the image height
-    local_seg_path:str = ""
+    local_seg_path: str = ""
     local_depth_path: str = ""
     local_normal_path: str = ""
     local_pose_path: str = ""
-    pt_type:str = "float32_torch"
-    model_dir='models'
-    process_size=(1024,768)
-    detector=None
-    remove_bg=True
-    use_torchscript_seg=False
+    pt_type: str = "float32_torch"
+    model_dir = 'models'
+    process_size = (1024, 768)
+    detector = None
+    remove_bg = True
+    use_torchscript_seg = False
     use_torchscript_depth = False
     use_torchscript_pose = False
     use_torchscript_normal = False
-    show_pose_object=False
-    use_pellete=True
+    show_pose_object = False
+    use_pellete = True
     
     def __str__(self):
         return f"SapiensConfig(dtype={self.dtype}\n" \
@@ -44,7 +47,7 @@ class SapiensConfig:
                f"normal_type={self.normal_type}\n" \
                f"depth_type={self.depth_type}\n" \
                f"minimum_person_height={self.minimum_person_height * 100}% of the image height"
-               # f"detector_config={self.detector_config}\n" \
+        # f"detector_config={self.detector_config}\n" \
 
 
 def filter_small_boxes(boxes: np.ndarray, img_height: int, height_thres: float = 0.1) -> np.ndarray:
@@ -69,51 +72,65 @@ def expand_boxes(boxes: np.ndarray, img_shape: tuple[int, int], padding: int = 5
         expanded_boxes.append([x1, y1, x2, y2])
     return np.array(expanded_boxes)
 
+
 class SapiensPredictor:
     def __init__(self, config: SapiensConfig):
         self.has_normal = config.normal_type != SapiensNormalType.OFF
         self.has_depth = config.depth_type != SapiensDepthType.OFF
-        self.has_pose=config.pose_type != SapiensPoseEstimationType.OFF
-        self.has_seg=config.segmentation_type != SapiensSegmentationType.OFF
+        self.has_pose = config.pose_type != SapiensPoseEstimationType.OFF
+        self.has_seg = config.segmentation_type != SapiensSegmentationType.OFF
         
         self.minimum_person_height = config.minimum_person_height
-        self.img_size= config.process_size
+        self.img_size = config.process_size
         
         self.local_seg = config.local_seg_path
         self.local_normal = config.local_normal_path
         self.local_depth = config.local_depth_path
-        self.local_pose=config.local_pose_path
+        self.local_pose = config.local_pose_path
         
-        self.use_torchscript_seg=config.use_torchscript_seg
+        self.use_torchscript_seg = config.use_torchscript_seg
         self.use_torchscript_depth = config.use_torchscript_depth
         self.use_torchscript_normal = config.use_torchscript_normal
         self.use_torchscript_pose = config.use_torchscript_pose
         
-        self.show_pose_object=config.show_pose_object
-        self.remove_bg=config.remove_bg
-        self.use_pellete=config.use_pellete
+        self.show_pose_object = config.show_pose_object
+        self.remove_bg = config.remove_bg
+        self.use_pellete = config.use_pellete
         
-        self.pt_type=config.pt_type
-        self.model_dir=config.model_dir
+        self.pt_type = config.pt_type
+        self.model_dir = config.model_dir
         
-        self.normal_predictor = SapiensNormal(config.normal_type, self.local_normal ,self.pt_type,self.model_dir,self.img_size,self.use_torchscript_normal,config.device,
+        self.normal_predictor = SapiensNormal(config.normal_type, self.local_normal, self.pt_type, self.model_dir,
+                                              self.img_size, self.use_torchscript_normal, config.device,
                                               config.dtype) if self.has_normal and not self.use_pellete else None
-        self.segmentation_predictor = SapiensSegmentation(config.segmentation_type,self.local_seg,self.pt_type,self.model_dir,self.img_size, self.use_torchscript_seg,config.device, config.dtype)if self.has_seg and not self.use_pellete else None
+        self.segmentation_predictor = SapiensSegmentation(config.segmentation_type, self.local_seg, self.pt_type,
+                                                          self.model_dir, self.img_size, self.use_torchscript_seg,
+                                                          config.device,
+                                                          config.dtype) if self.has_seg and not self.use_pellete else None
         
-        self.depth_predictor = SapiensDepth(config.depth_type, self.local_depth,self.pt_type,self.model_dir,self.img_size,self.use_torchscript_depth,config.device, config.dtype) if self.has_depth and not self.use_pellete else None
+        self.depth_predictor = SapiensDepth(config.depth_type, self.local_depth, self.pt_type, self.model_dir,
+                                            self.img_size, self.use_torchscript_depth, config.device,
+                                            config.dtype) if self.has_depth and not self.use_pellete else None
         
         self.pose_predictor = SapiensPoseEstimation(config.pose_type, self.local_pose, self.pt_type, self.model_dir,
-                                            self.img_size, self.use_torchscript_pose,self.show_pose_object,config.device, config.dtype) if self.has_pose  else None
+                                                    self.img_size, self.use_torchscript_pose, self.show_pose_object,
+                                                    config.device, config.dtype) if self.has_pose else None
         
-        self.seg_pred=SapiensSeg(config.segmentation_type,self.local_seg,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_seg and self.use_pellete else None
-        self.depth_pred =DepthSapiens(config.depth_type,self.local_depth,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_depth  and self.use_pellete else None
-        self.normal_pred =NormalSapiens(config.normal_type,self.local_normal,self.pt_type,self.model_dir,self.use_torchscript_seg, config.dtype)if self.has_normal and self.use_pellete else None
+        self.seg_pred = SapiensSeg(config.segmentation_type, self.local_seg, self.pt_type, self.model_dir,
+                                   self.use_torchscript_seg,
+                                   config.dtype) if self.has_seg and self.use_pellete else None
+        self.depth_pred = DepthSapiens(config.depth_type, self.local_depth, self.pt_type, self.model_dir,
+                                       self.use_torchscript_seg,
+                                       config.dtype) if self.has_depth and self.use_pellete else None
+        self.normal_pred = NormalSapiens(config.normal_type, self.local_normal, self.pt_type, self.model_dir,
+                                         self.use_torchscript_seg,
+                                         config.dtype) if self.has_normal and self.use_pellete else None
         
-        self.detector = config.detector  #Detector(config.detector_config) #TODO: Cropping seems to make the results worse
-
-    def __call__(self, img: np.ndarray,select_obj,RGB_BG) :
-        return self.predict(img,select_obj,RGB_BG)
-
+        self.detector = config.detector  # Detector(config.detector_config) #TODO: Cropping seems to make the results worse
+    
+    def __call__(self, img: np.ndarray, select_obj, RGB_BG):
+        return self.predict(img, select_obj, RGB_BG)
+    
     def enable_model_cpu_offload(self):
         if self.has_seg:
             if self.use_pellete:
@@ -123,24 +140,24 @@ class SapiensPredictor:
         if self.has_normal:
             if self.use_pellete:
                 self.normal_pred.enable_model_cpu_offload()
-                
+            
             else:
                 self.normal_predictor.enable_model_cpu_offload()
         if self.has_depth:
             if self.use_pellete:
                 self.depth_pred.enable_model_cpu_offload()
-                
+            
             else:
                 self.depth_predictor.enable_model_cpu_offload()
         if self.has_pose:
             self.pose_predictor.enable_model_cpu_offload()
-
+    
     def move_to_cuda(self):
         if self.has_seg:
             if self.use_pellete:
                 self.seg_pred.move_to_cuda()
             else:
-               self.segmentation_predictor.move_to_cuda()
+                self.segmentation_predictor.move_to_cuda()
         if self.has_normal:
             if self.use_pellete:
                 self.normal_pred.move_to_cuda()
@@ -153,28 +170,28 @@ class SapiensPredictor:
                 self.depth_predictor.move_to_cuda()
         if self.has_pose:
             self.pose_predictor.move_to_cuda()
-
-    def predict(self, img,select_obj,RGB_BG) :# PIL.Image or np.ndarray
+    
+    def predict(self, img, select_obj, RGB_BG):  # PIL.Image or np.ndarray
         if self.use_pellete:
-            seg_list=[]
-            depth_list=[]
-            normal_list=[]
-            pose_list=[]
-            seg_mask=[]
+            seg_list = []
+            depth_list = []
+            normal_list = []
+            pose_list = []
+            seg_mask = []
             if self.has_seg:
-                seg_map, mask_map,seg_preds = self.seg_pred(img, select_obj,RGB_BG)
+                seg_map, mask_map, seg_preds = self.seg_pred(img, select_obj, RGB_BG)
                 seg_list = [seg_map]
                 seg_mask = [mask_map]
             seg_in = seg_preds if self.has_seg else None
             if self.has_depth:
-                depth_list =[self.depth_pred(img, self.has_seg, seg_in,RGB_BG)]
+                depth_list = [self.depth_pred(img, self.has_seg, seg_in, RGB_BG)]
             if self.has_normal:
-                normal_list = [self.normal_pred(img, self.has_seg, seg_in,RGB_BG)]
-            if self.has_pose: #pil-cv-pil,keypoint can save
-                img_np=convert_from_image_to_cv2(img)
-                pose_result_image, keypoints=self.pose_predictor(img_np)
-                pose_list =[convert_from_cv2_to_image(pose_result_image)]
-            return seg_list if seg_list else None,depth_list if depth_list else None,normal_list if normal_list else None,pose_list if pose_list else None,seg_mask if seg_list else None
+                normal_list = [self.normal_pred(img, self.has_seg, seg_in, RGB_BG)]
+            if self.has_pose:  # pil-cv-pil,keypoint can save
+                img_np = convert_from_image_to_cv2(img)
+                pose_result_image, keypoints = self.pose_predictor(img_np)
+                pose_list = [convert_from_cv2_to_image(pose_result_image)]
+            return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
         else:
             img_shape = img.shape  # 768, 1024, 3 np.ndarray
             if self.detector is not None:
@@ -207,13 +224,12 @@ class SapiensPredictor:
                 if self.has_pose:
                     pose_maps.append(self.pose_predictor(crop))  # tuple
             
-            return self.draw_maps(img, person_boxes, normal_maps, segmentation_maps, depth_maps, pose_maps,RGB_BG)
-        
-
-    #TODO: Clean this up
-    def draw_maps(self, img, person_boxes, normal_maps, segmentation_maps, depth_maps,pose_maps,RGB_BG):
+            return self.draw_maps(img, person_boxes, normal_maps, segmentation_maps, depth_maps, pose_maps, RGB_BG)
+    
+    # TODO: Clean this up
+    def draw_maps(self, img, person_boxes, normal_maps, segmentation_maps, depth_maps, pose_maps, RGB_BG):
         seg_list = []
-        seg_mask=[]
+        seg_mask = []
         if self.has_seg:
             segmentation_img = img.copy()
             empty_cv = np.empty(segmentation_img.shape, dtype=np.uint8)
@@ -223,12 +239,12 @@ class SapiensPredictor:
                 origin = segmentation_img[box[1]:box[3], box[0]:box[2]]
                 crop = empty_cv if self.remove_bg else origin
                 segmentation_draw = draw_segmentation_map(segmentation_map)
-                real_mask=get_mask(segmentation_draw)
+                real_mask = get_mask(segmentation_draw)
                 segmentation_img[box[1]:box[3], box[0]:box[2]] = origin * mask[..., None] + crop * ~mask[..., None]
             seg_list.append(segmentation_img)
             seg_mask.append(real_mask)
-            
-        normal_list=[]
+        
+        normal_list = []
         if self.has_normal:
             normal_img = img.copy()
             empty_cv = np.empty(normal_img.shape, dtype=np.uint8)
@@ -236,7 +252,7 @@ class SapiensPredictor:
             if self.has_seg:
                 for i, (normal_map, box) in enumerate(zip(normal_maps, person_boxes)):
                     mask = segmentation_maps[i] > 0
-                    crop = empty_cv if self.remove_bg else  normal_img[box[1]:box[3], box[0]:box[2]]
+                    crop = empty_cv if self.remove_bg else normal_img[box[1]:box[3], box[0]:box[2]]
                     normal_draw = draw_normal_map(normal_map)
                     crop_draw = cv2.addWeighted(crop, 0.5, normal_draw, 0.7, 0)
                     normal_img[box[1]:box[3], box[0]:box[2]] = crop_draw * mask[..., None] + crop * ~mask[..., None]
@@ -244,13 +260,13 @@ class SapiensPredictor:
             else:
                 for i, (normal_map, box) in enumerate(zip(normal_maps, person_boxes)):
                     normal_img = draw_normal_map(normal_map)
-                normal_list.append( normal_img)
-            
+                normal_list.append(normal_img)
+        
         depth_list = []
         if self.has_depth:
             depth_img = img.copy()
             empty_cv = np.empty(depth_img.shape, dtype=np.uint8)
-            empty_cv[:] = RGB_BG#(255, 255, 255)
+            empty_cv[:] = RGB_BG  # (255, 255, 255)
             if self.has_seg:
                 for i, (depth_map, box) in enumerate(zip(depth_maps, person_boxes)):
                     mask = segmentation_maps[i] > 0
@@ -264,14 +280,15 @@ class SapiensPredictor:
                 for i, (depth_map, box) in enumerate(zip(depth_maps, person_boxes)):
                     depth_img = draw_depth_map(depth_map)
                 depth_list.append(depth_img)
-                
+        
         pose_list = []
         if self.has_pose:
             pose_img = img.copy()
             empty_cv = np.empty(pose_img.shape, dtype=np.uint8)
-            empty_cv[:] =  RGB_BG#(0, 0, 0)
+            empty_cv[:] = RGB_BG  # (0, 0, 0)
             if self.has_seg:
-                for i, (pose_map, box) in enumerate(zip(pose_maps, person_boxes)):#pose_maps:tuple(result_img, all_keypoints)
+                for i, (pose_map, box) in enumerate(
+                        zip(pose_maps, person_boxes)):  # pose_maps:tuple(result_img, all_keypoints)
                     mask = segmentation_maps[i] > 0
                     crop = empty_cv if self.remove_bg else pose_img[box[1]:box[3], box[0]:box[2]]
                     pose_map[0][~mask] = 0
@@ -279,13 +296,15 @@ class SapiensPredictor:
                 pose_list.append(pose_img)
             else:
                 for i, (pose_map, box) in enumerate(zip(pose_maps, person_boxes)):
-                    pose_img=pose_map[0]
+                    pose_img = pose_map[0]
                 pose_list.append(pose_img)
-        return  seg_list if seg_list else None,depth_list if depth_list else None,normal_list if normal_list else None,pose_list if pose_list else None,seg_mask if seg_list else None
+        return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
+
 
 def convert_from_image_to_cv2(img: Image) -> np.ndarray:
     # return np.asarray(img)
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
 
 def convert_from_cv2_to_image(img: np.ndarray) -> Image:
     # return Image.fromarray(img)
