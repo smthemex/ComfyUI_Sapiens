@@ -2,11 +2,14 @@
 # -*- coding: UTF-8 -*-
 import logging
 import os
+import time
+
+from tqdm import tqdm
+import numpy as np
 import torch
 from .Sapiens_Pytorch import SapiensPredictor, SapiensConfig
 from .Sapiens_Pytorch.classes_and_palettes import GOLIATH_CLASSES_FIX, GOLIATH_CLASSES
 from .utils import get_models_path, tensor2cv, load_images, tensor2pil
-
 import folder_paths
 
 # add checkpoints dir
@@ -139,6 +142,7 @@ class SapiensSampler:
                 "image": ("IMAGE",),
                 "seg_select": (["none"] + list(GOLIATH_CLASSES_FIX),),
                 "add_seg_index": ("STRING", {"default": "", }),
+                "save_pose": ("BOOLEAN", {"default": False},),
                 "BG_R": ("INT", {
                     "default": 255,
                     "min": 0,  # Minimum value
@@ -168,7 +172,8 @@ class SapiensSampler:
     FUNCTION = "sampler_main"
     CATEGORY = "Sapiens"
     
-    def sampler_main(self, model, image, seg_select, add_seg_index, BG_R, BG_G, BG_B):
+    def sampler_main(self, model, image, seg_select, add_seg_index,save_pose, BG_R, BG_G, BG_B):
+        start = time.perf_counter()
         if not torch.backends.mps.is_available():
             if torch.cuda.is_available():
                 model.move_to_cuda()
@@ -212,7 +217,8 @@ class SapiensSampler:
         depth_list = []
         normal_list = []
         pose_list = []
-        for img in img_in:
+        for img in tqdm(img_in):
+        #for img in img_in:
             seg, depth, normal, pose, mask = model(img, seg_select, RGB_BG)
             if isinstance(seg, list):
                 seg_list.append(seg[0])
@@ -223,14 +229,20 @@ class SapiensSampler:
                 normal_list.append(normal[0])
             if isinstance(pose, list):
                 pose_list.append(pose[0])
+        if pose_list and save_pose:
+            print(f"pose counts is {len(pose_list)},Save pose as *.npy files in comfyUI output....")
+            for i,img in enumerate(pose_list):
+                np.save(os.path.join(folder_paths.get_output_directory(),f"{i}"),np.array(img))
         seg_img = load_images(seg_list) if seg_list else zero_tensor
         normal_img = load_images(normal_list) if normal_list else zero_tensor
         depth_img = load_images(depth_list) if depth_list else zero_tensor
         pose_img = load_images(pose_list) if pose_list else zero_tensor
         mask = torch.cat(mask_list, dim=0) if mask_list else torch.zeros((64, 64), dtype=torch.float32, device="cpu")
+        
         if not torch.backends.mps.is_available():
             if torch.cuda.is_available():
                 model.enable_model_cpu_offload()
+        print(f"ALL inference took: {time.perf_counter() - start:.4f} seconds")
         return (seg_img, depth_img, normal_img, pose_img, mask)
 
 
