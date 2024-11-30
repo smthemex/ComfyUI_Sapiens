@@ -87,7 +87,7 @@ class SapiensDepth():
             results = self.model(tensor)
 
         depth_map = postprocess_depth(results, img.shape[:2])
-        print(f"Depth inference took: {time.perf_counter() - start:.4f} seconds")
+        #print(f"Depth inference took: {time.perf_counter() - start:.4f} seconds")
         return depth_map
     
     def enable_model_cpu_offload(self):
@@ -116,11 +116,11 @@ class DepthSapiens():
             path = download_hf_model(self.model_name.value, TaskType.DEPTH, self.model_dir, dtype=self.pt_type)
         self.model = ModelManager.load_model(path, self.device)
     
-    def __call__(self, image, if_seg,seg_in,RGB_BG):
+    def __call__(self, image, if_seg,seg_in,select_obj,RGB_BG):
         start = time.perf_counter()
         with torch.inference_mode():
-            result= self.image_processor.process_image(image, self.model,if_seg,seg_in,RGB_BG, model_dtype=self.dtype)
-        print(f"Depth inference took: {time.perf_counter() - start:.4f} seconds")
+            result= self.image_processor.process_image(image, self.model,if_seg,seg_in,select_obj,RGB_BG, model_dtype=self.dtype)
+        #print(f"Depth inference took: {time.perf_counter() - start:.4f} seconds")
         return result
     
     def enable_model_cpu_offload(self):
