@@ -36,7 +36,7 @@ class Detector:
         person_detections = detections[detections[:, -1] == self.person_id]
         boxes = person_detections[:, :-2].astype(int)
 
-        print(f"Detection inference took: {time.perf_counter() - start:.4f} seconds")
+        #print(f"Detection inference took: {time.perf_counter() - start:.4f} seconds")
         return boxes
 
 
