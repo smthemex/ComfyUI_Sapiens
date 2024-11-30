@@ -1,5 +1,6 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
+import math
 from dataclasses import dataclass
 import cv2
 import numpy as np
@@ -10,7 +11,7 @@ from .segmentation import SapiensSegmentation, SapiensSegmentationType, draw_seg
 from .normal import SapiensNormal, SapiensNormalType, draw_normal_map, NormalSapiens
 from .pose import SapiensPoseEstimationType, SapiensPoseEstimation
 from .detector import Detector
-from .common import get_mask
+from .common import get_mask,aplly_seg
 
 
 @dataclass
@@ -184,12 +185,23 @@ class SapiensPredictor:
                 seg_mask = [mask_map]
             seg_in = seg_preds if self.has_seg else None
             if self.has_depth:
-                depth_list = [self.depth_pred(img, self.has_seg, seg_in, RGB_BG)]
+                depth_list = [self.depth_pred(img, self.has_seg, seg_in, select_obj,RGB_BG)]
             if self.has_normal:
-                normal_list = [self.normal_pred(img, self.has_seg, seg_in, RGB_BG)]
+                normal_list = [self.normal_pred(img, self.has_seg, seg_in,select_obj, RGB_BG)]
             if self.has_pose:  # pil-cv-pil,keypoint can save
                 img_np = convert_from_image_to_cv2(img)
-                pose_result_image, keypoints = self.pose_predictor(img_np)
+                pose_result_image, keypoints,box_size = self.pose_predictor(img_np)
+                # for i in keypoints:
+                #     left_ear = i["left_ear"]  if i.get("left_ear")  != None else None
+                #     right_ear = i["right_ear"]  if i.get("right_ear")  != None else None
+                #     if right_ear and left_ear:
+                #         distance = math.pow((int(right_ear[0] * box_size[0] / 192) - int(left_ear[0] * box_size[1] / 256)),
+                #                             2) + math.pow(
+                #             (int(right_ear[1] * box_size[0] / 256) - int(left_ear[1] * box_size[1] / 256)), 2)
+                #         distance = math.sqrt(distance)
+                        
+                if self.has_seg:
+                    pose_result_image=aplly_seg(Image.fromarray(pose_result_image),seg_in,select_obj,[0,0,0])
                 pose_list = [convert_from_cv2_to_image(pose_result_image)]
             return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
         else:
