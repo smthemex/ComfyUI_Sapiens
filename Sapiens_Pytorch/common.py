@@ -94,6 +94,35 @@ class ImageProcessor:
         return Image.fromarray(blended_seg),blended_mask
 
 
+def aplly_seg(img,preds,select_obj,RGB_BG):
+    img_np = np.array(img.convert("RGB"))
+    
+    mask = preds.squeeze(0).cpu().numpy()
+    sem_seg = np.array(mask)
+    num_classes = len(GOLIATH_CLASSES)
+    ids = np.unique(sem_seg)[::-1]
+    legal_indices = ids < num_classes
+    ids = ids[legal_indices]
+    overlay = np.zeros((*sem_seg.shape, 3), dtype=np.uint8)
+    empty_np = np.zeros_like(img_np.shape)
+    if select_obj:
+        labels_s = np.array(select_obj, dtype=np.int64)
+        colors_s = [GOLIATH_PALETTE[label] for label in labels_s]
+        for label, color in zip(labels_s, colors_s):
+            overlay[sem_seg == label, :] = color
+    else:
+        labels = np.array(ids, dtype=np.int64)
+        labels = labels[labels != 0]  # remove bg
+        colors = [GOLIATH_PALETTE[label] for label in labels]
+        for label, color in zip(labels, colors):
+            overlay[sem_seg == label, :] = color
+    x = np.uint8(empty_np + overlay)
+    seg_gray = cv2.cvtColor(x, cv2.COLOR_BGR2GRAY)
+    ret, mask_ = cv2.threshold(seg_gray, 0, 255, cv2.THRESH_BINARY)
+    img_np[mask_ == 0] = RGB_BG  # [255, 255, 255]
+    return np.uint8(img_np)
+
+
 class ImageProcessorDepth:
     def __init__(self):
         self.transform_fn = transforms.Compose([
@@ -104,18 +133,14 @@ class ImageProcessorDepth:
         ])
     
 
-    def process_image(self, image: Image.Image, depth_model, if_seg,seg_in,RGB_BG, model_dtype: torch.dtype = torch.float32):
+    def process_image(self, image: Image.Image, depth_model, if_seg,seg_in,select_obj,RGB_BG, model_dtype: torch.dtype = torch.float32):
         input_tensor = self.transform_fn(image).unsqueeze(0).to(device_).to(model_dtype)
         depth_output = ModelManager.run_model_depth(depth_model, input_tensor, image.height, image.width).to(torch.float32)
         depth_map = depth_output.squeeze().cpu().numpy()
+        depth_colored = self.colorize_depth_map(depth_map)
         
         if if_seg:
-            seg_mask = (seg_in.argmax(dim=1) > 0).float().cpu().numpy()[0]
-            depth_map[seg_mask == 0] = RGB_BG
-            #depth_map[seg_mask == 0] = np.nan
-        
-        depth_colored = self.colorize_depth_map(depth_map)
-       
+            depth_colored=aplly_seg(Image.fromarray(depth_colored),seg_in,select_obj,RGB_BG)
         return Image.fromarray(depth_colored)
     
     @staticmethod
@@ -141,7 +166,7 @@ class ImageProcessorNormal:
             transforms.Normalize(mean=[123.5/255, 116.5/255, 103.5/255], std=[58.5/255, 57.0/255, 57.5/255]),
         ])
 
-    def process_image(self, image: Image.Image, normal_model, if_seg,seg_in,RGB_BG, model_dtype: torch.dtype = torch.float32):
+    def process_image(self, image: Image.Image, normal_model, if_seg,seg_in,select_obj,RGB_BG, model_dtype: torch.dtype = torch.float32):
         # Load models here instead of storing them as class attributes
         
         input_tensor = self.transform_fn(image).unsqueeze(0).to(device_).to(model_dtype)
@@ -154,17 +179,13 @@ class ImageProcessorNormal:
         # Create a copy of the normal map for visualization
         normal_map_vis = normal_map.copy()
 
-        # Run segmentation
-        if if_seg:
-            seg_mask = (seg_in.argmax(dim=1) > 0).float().cpu().numpy()[0]
-
-            # Apply segmentation mask to normal maps
-            normal_map[seg_mask == 0] = np.nan  # Set background to NaN for NPY file
-            #normal_map_vis[seg_mask == 0] = -1  # Set background to -1 for visualization
-            normal_map_vis[seg_mask == 0] = RGB_BG  # Set background to -1 for visualization
-
         # Normalize and visualize normal map
         normal_map_vis = self.visualize_normal_map(normal_map_vis)
+        
+        # Run segmentation
+        if if_seg:
+            normal_map_vis=aplly_seg(Image.fromarray(normal_map_vis),seg_in,select_obj,RGB_BG)
+        
         return Image.fromarray(normal_map_vis)
 
     @staticmethod
