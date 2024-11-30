@@ -71,10 +71,10 @@ class SapiensPoseEstimation:
         bboxes = self.detector.detect(img)
 
         # Process the image and estimate the pose
-        pose_result_image, keypoints = self.estimate_pose(img, bboxes)
+        pose_result_image, keypoints,box_size = self.estimate_pose(img, bboxes)
 
-        print(f"Pose estimation inference took: {time.perf_counter() - start:.4f} seconds")
-        return pose_result_image, keypoints
+        #print(f"Pose estimation inference took: {time.perf_counter() - start:.4f} seconds")
+        return pose_result_image, keypoints,box_size
     
     def enable_model_cpu_offload(self):
         self.model.to("cpu")
@@ -84,7 +84,7 @@ class SapiensPoseEstimation:
         self.model.to("cuda")
 
     @torch.inference_mode()
-    def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]]) -> (np.ndarray, List[dict]):
+    def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]]) -> (np.ndarray, List[dict],tuple):
         all_keypoints = []
         result_img = img.copy()
 
@@ -99,12 +99,12 @@ class SapiensPoseEstimation:
                 # Draw black BG
                 empty_cv = np.empty(result_img.shape, dtype=np.uint8)
                 empty_cv[:] = (0, 0, 0)
-                result_img = self.draw_keypoints(empty_cv, keypoints, bbox)
+                result_img,box_size = self.draw_keypoints(empty_cv, keypoints, bbox)
             else:
                 # Draw the keypoints on the original image
-                result_img = self.draw_keypoints(result_img, keypoints, bbox)
+                result_img,box_size = self.draw_keypoints(result_img, keypoints, bbox)
            
-        return result_img, all_keypoints
+        return result_img, all_keypoints,box_size
 
     def crop_image(self, img: np.ndarray, bbox: List[float]) -> np.ndarray:
         x1, y1, x2, y2 = map(int, bbox[:4])
@@ -121,11 +121,13 @@ class SapiensPoseEstimation:
         return keypoints
 
 
-    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float]) -> np.ndarray:
+    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float]) ->(np.ndarray,tuple) :
         x1, y1, x2, y2 = map(int, bbox[:4])
+      
         bbox_width, bbox_height = x2 - x1, y2 - y1
+    
         img_copy = img.copy()
-
+        box_size=(bbox_width, bbox_height)
         # Draw keypoints on t1Bhe image
         for i, (name, (x, y, conf)) in enumerate(keypoints.items()):
             if conf > 0.3:  # Only draw confident keypoints
@@ -146,7 +148,7 @@ class SapiensPoseEstimation:
                     y2_coord = int(pt2[1] * bbox_height / 256) + y1
                     cv2.line(img_copy, (x1_coord, y1_coord), (x2_coord, y2_coord), GOLIATH_KPTS_COLORS[i], 2)
 
-        return img_copy
+        return img_copy,box_size
 
     
  
