@@ -3,11 +3,13 @@ You can call Using Sapiens to get seg,normal,pose,depth,mask maps.
 
 Sapiens From: [facebookresearch/sapiens](https://github.com/facebookresearch/sapiens) 
 
-**Update-2024/11/02**
-* try add MPS support or no cuda user..
+**Update-2024/11/30**
+* Fixed bug where SEG cannot be used to separate normals, poses, and depths, and added a button to save pose npy files;
+* 修复无法利用SEG分离法线，姿态和深度的bug，新增保存姿态npy文件按钮; 
 
 **previous update**
-* 加入模型卸载代码，便于连接其他节点，感谢@lyxkilo 的代码，通过他的代码可以将fp32的模型转为fp16模型（更小，1B seg 2G左右），首次运行会生成一个同名加fp16模型文件，生成后不需要再开启fp16生成按钮；  
+* 加入模型卸载代码，便于连接其他节点，感谢@lyxkilo 的代码，通过他的代码可以将fp32的模型转为fp16模型（更小，1B seg 2G左右），首次运行会生成一个同名加fp16模型文件，生成后不需要再开启fp16生成按钮；
+* try add MPS support or no cuda user..
 * Add model uninstallation code for easy connection to other nodes. Thanks to @lyxkilo's code, it is possible to convert the FP32 model to an FP16 model (smaller, around 1B SEG 2G)，The first run will generate an fp16 model file with the same name, and there is no need to enable the fp16 generation button after generation.    
 * seg选择人体部位的方式是数字加“，”，例如 2，1，11，注意逗号是英文符号。
 
@@ -52,7 +54,8 @@ yolo是pose必须的，官方的太复杂，不如yolo好用；
 ----
 **seg body**    
 * 可以选人体部位27种类型 （Latest version)        
-![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/new_example.png) 
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/exampleA.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/exampleB.png) 
 
 Citation
 ------
