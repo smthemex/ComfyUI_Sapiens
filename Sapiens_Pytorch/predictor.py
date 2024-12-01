@@ -190,7 +190,10 @@ class SapiensPredictor:
                 normal_list = [self.normal_pred(img, self.has_seg, seg_in,select_obj, RGB_BG)]
             if self.has_pose:  # pil-cv-pil,keypoint can save
                 img_np = convert_from_image_to_cv2(img)
-                pose_result_image, keypoints,box_size = self.pose_predictor(img_np)
+                
+                filter_obj=select_obj.copy() if not self.has_seg and select_obj else None # only useful when no seg and select_obj
+              
+                pose_result_image, keypoints,box_size = self.pose_predictor(img_np,filter_obj)
                 # for i in keypoints:
                 #     left_ear = i["left_ear"]  if i.get("left_ear")  != None else None
                 #     right_ear = i["right_ear"]  if i.get("right_ear")  != None else None
@@ -202,6 +205,9 @@ class SapiensPredictor:
                         
                 if self.has_seg:
                     pose_result_image=aplly_seg(Image.fromarray(pose_result_image),seg_in,select_obj,[0,0,0])
+                
+                    
+                    
                 pose_list = [convert_from_cv2_to_image(pose_result_image)]
             return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
         else:
@@ -234,7 +240,7 @@ class SapiensPredictor:
                 if self.has_depth:
                     depth_maps.append(self.depth_predictor(crop))
                 if self.has_pose:
-                    pose_maps.append(self.pose_predictor(crop))  # tuple
+                    pose_maps.append(self.pose_predictor(crop,select_obj))  # tuple
             
             return self.draw_maps(img, person_boxes, normal_maps, segmentation_maps, depth_maps, pose_maps, RGB_BG)
     
