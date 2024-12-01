@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from .common import pose_estimation_preprocessor, TaskType, download_hf_model
 from .detector import Detector
-
+from .classes_and_palettes import GOLIATH_CLASSES_FIX
 from .pose_classes_and_palettes import (
     COCO_KPTS_COLORS,
     COCO_WHOLEBODY_KPTS_COLORS,
@@ -64,14 +64,30 @@ class SapiensPoseEstimation:
         # Initialize the YOLO-based detector
         self.detector = Detector()
 
-    def __call__(self, img: np.ndarray) -> (np.ndarray,):
+    def __call__(self, img: np.ndarray,filter_obj) -> (np.ndarray,):
         start = time.perf_counter()
 
         # Detect persons in the image
         bboxes = self.detector.detect(img)
+        
+        GOLIATH_ELBOW_HAND_KEY = ["hand", "finger", "thumb", "elbow", "wrist", "olecranon", "cubital_fossa"]
+        GOLIATH_FACE_NECK_KEY= ["nose", "eye", "neck","ear", "labiomental", "glabella", "chin", "lash","crease","nostril","mouth","lip","helix","tragus","iris","pupil","between_22_15","concha","crus"]
+        GOLIATH_LOWER_LIMBS_KEY= ["hip", "knee", "ankle", "toe", "heel"]
+        GOLIATH_TORSO_KEY= ["hip", "shoulder"]
+        filter_obj_list= {"Face_Neck":GOLIATH_FACE_NECK_KEY,"Left_Hand":GOLIATH_ELBOW_HAND_KEY,"Left_Foot":GOLIATH_LOWER_LIMBS_KEY,"Torso":GOLIATH_TORSO_KEY}
+        filter_obj_done=[]
+        if filter_obj:
+            select_str_list = [list(GOLIATH_CLASSES_FIX)[i].split(".")[-1] for i in filter_obj]
+            if all(any(x in y for y in select_str_list) for x in list(filter_obj_list.keys()) ):
+                filter_obj_done=[]
+            else:
+                for i in select_str_list:
+                    if filter_obj_list.get(i):
+                        filter_obj_done.append(filter_obj_list.get(i))
 
-        # Process the image and estimate the pose
-        pose_result_image, keypoints,box_size = self.estimate_pose(img, bboxes)
+            
+            # Process the image and estimate the pose
+        pose_result_image, keypoints,box_size = self.estimate_pose(img, bboxes,filter_obj_done)
 
         #print(f"Pose estimation inference took: {time.perf_counter() - start:.4f} seconds")
         return pose_result_image, keypoints,box_size
@@ -84,7 +100,7 @@ class SapiensPoseEstimation:
         self.model.to("cuda")
 
     @torch.inference_mode()
-    def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]]) -> (np.ndarray, List[dict],tuple):
+    def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]],filter_obj_done) -> (np.ndarray, List[dict],tuple):
         all_keypoints = []
         result_img = img.copy()
 
@@ -99,10 +115,10 @@ class SapiensPoseEstimation:
                 # Draw black BG
                 empty_cv = np.empty(result_img.shape, dtype=np.uint8)
                 empty_cv[:] = (0, 0, 0)
-                result_img,box_size = self.draw_keypoints(empty_cv, keypoints, bbox)
+                result_img,box_size = self.draw_keypoints(empty_cv, keypoints, bbox,filter_obj_done)
             else:
                 # Draw the keypoints on the original image
-                result_img,box_size = self.draw_keypoints(result_img, keypoints, bbox)
+                result_img,box_size = self.draw_keypoints(result_img, keypoints, bbox,filter_obj_done)
            
         return result_img, all_keypoints,box_size
 
@@ -120,12 +136,26 @@ class SapiensPoseEstimation:
                 keypoints[name] = (float(x), float(y), float(conf))
         return keypoints
 
-
-    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float]) ->(np.ndarray,tuple) :
+ 
+    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float],filter_obj_done) ->(np.ndarray,tuple) :
+        
+        if filter_obj_done:
+            get_list=[]
+            for i in filter_obj_done:
+                for j in i:
+                    get_list.append(j)
+            obj_list=list(set(get_list))
+            KEYPOINTS_obj = {}
+            for i in obj_list:
+                for j, (name, (x, y, conf)) in enumerate(keypoints.items()):
+                    if i in name:
+                        KEYPOINTS_obj[name]=(x, y, conf)
+            keypoints=KEYPOINTS_obj
+            
         x1, y1, x2, y2 = map(int, bbox[:4])
       
         bbox_width, bbox_height = x2 - x1, y2 - y1
-    
+       
         img_copy = img.copy()
         box_size=(bbox_width, bbox_height)
         # Draw keypoints on t1Bhe image
@@ -134,7 +164,8 @@ class SapiensPoseEstimation:
                 x_coord = int(x * bbox_width / 192) + x1
                 y_coord = int(y * bbox_height / 256) + y1
                 cv2.circle(img_copy, (x_coord, y_coord), 3, GOLIATH_KPTS_COLORS[i], -1)
-
+        
+        upper_limb_keypoints=[]
         # Optionally draw skeleton
         for _, link_info in GOLIATH_SKELETON_INFO.items():
             pt1_name, pt2_name = link_info['link']
@@ -151,7 +182,3 @@ class SapiensPoseEstimation:
         return img_copy,box_size
 
     
- 
-       
-       
-
