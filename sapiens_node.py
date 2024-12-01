@@ -1,6 +1,5 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
-import logging
 import os
 import time
 
@@ -20,11 +19,8 @@ if not os.path.exists(weigths_current_path):
 try:
     folder_paths.add_model_folder_path("sapiens", weigths_current_path, False)
 except:
-    try:
-        folder_paths.add_model_folder_path("sapiens", weigths_current_path)
-        logging.warning("old comfyUI version")
-    except:
-        raise "please update your comfyUI version"
+    folder_paths.add_model_folder_path("sapiens", weigths_current_path)
+
 weigths_seg_path = os.path.join(weigths_current_path, "seg")
 if not os.path.exists(weigths_seg_path):
     os.makedirs(weigths_seg_path)
@@ -180,7 +176,7 @@ class SapiensSampler:
         
         RGB_BG = [BG_R, BG_G, BG_B]
         
-        # select body index"
+        # select body index
         add_seg_list = add_seg_index.split(",") if add_seg_index else []
         add_seg_list = [int(i) for i in add_seg_list if int(i) < 29] if add_seg_list else []
         if seg_select != "none":
@@ -188,7 +184,6 @@ class SapiensSampler:
             seg_select = [list(GOLIATH_CLASSES).index(seg_select)]
             if add_seg_list:
                 seg_select = seg_select + add_seg_list  # [0,...,27]
-        
         else:
             seg_select = []
         
@@ -196,7 +191,7 @@ class SapiensSampler:
         
         print(f"Select seg part of {seg_select_all} ")
         
-        model.select = seg_select
+        #model.select = seg_select
         
         b, _, _, _ = image.size()
         if b == 1:
