@@ -172,7 +172,7 @@ class SapiensPredictor:
         if self.has_pose:
             self.pose_predictor.move_to_cuda()
     
-    def predict(self, img, select_obj, RGB_BG):  # PIL.Image or np.ndarray
+    def predict(self, img, select_obj, RGB_BG):  # PIL.Image when use pellete ,np.ndarray
         if self.use_pellete:
             seg_list = []
             depth_list = []
@@ -189,11 +189,9 @@ class SapiensPredictor:
             if self.has_normal:
                 normal_list = [self.normal_pred(img, self.has_seg, seg_in,select_obj, RGB_BG)]
             if self.has_pose:  # pil-cv-pil,keypoint can save
-                img_np = convert_from_image_to_cv2(img)
-                
                 filter_obj=select_obj.copy() if not self.has_seg and select_obj else None # only useful when no seg and select_obj
               
-                pose_result_image, keypoints,box_size = self.pose_predictor(img_np,filter_obj)
+                pose_result_image, keypoints,box_size = self.pose_predictor(np.array(img),filter_obj)
                 # for i in keypoints:
                 #     left_ear = i["left_ear"]  if i.get("left_ear")  != None else None
                 #     right_ear = i["right_ear"]  if i.get("right_ear")  != None else None
@@ -205,9 +203,7 @@ class SapiensPredictor:
                         
                 if self.has_seg:
                     pose_result_image=aplly_seg(Image.fromarray(pose_result_image),seg_in,select_obj,[0,0,0])
-                
-                    
-                    
+  
                 pose_list = [convert_from_cv2_to_image(pose_result_image)]
             return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
         else:
