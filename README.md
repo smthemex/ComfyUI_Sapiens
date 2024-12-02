@@ -4,12 +4,12 @@ You can call Using Sapiens to get seg,normal,pose,depth,mask maps.
 Sapiens From: [facebookresearch/sapiens](https://github.com/facebookresearch/sapiens) 
 
 **Update-2024/12/01**
-* 基于COCOfullbody编码 ，单独使用pose模型时，可选pose的4种分离模式，分别是躯干，下肢，手，头部，对应选择seg_select 的编号分别是（21.torso，4.Left_foot,5.Left_Hand,3.Face_Neck），这4种也可以自由组合，全选默认输出所有pose；
-* Based on COCOfullbody encoding, when using the pose model alone, four separation modes of pose can be selected, namely ' torso, lower limbs, hands, and head.' The corresponding selection numbers for 'seg_ select' are (21. Torso, 4. Left_Foot, 5. Left_Hand, 3. Face_Neck). These four modes can also be freely combined, and selecting all will output all poses by default;  
+* 基于COCOfullbody编码 ，单独使用pose模型时，可选pose的5种分离模式，分别是躯干，下肢，手，上肢，头部，对应选择seg_select 的编号分别是（21.torso，4.Left_foot,5.Left_Hand,6.Left_lower_arm,3.Face_Neck），这5种也可以自由组合，全选默认输出所有pose；
+* Based on COCOfullbody encoding, when using the pose model alone, five separation modes of pose can be selected, namely ' torso, lower limbs, hands,lower_arm, and head.' The corresponding selection numbers for 'seg_ select' are (21. Torso, 4. Left_Foot, 5. Left_Hand,6.Left_lower_arm, 3. Face_Neck). These five modes can also be freely combined, and selecting all will output all poses by default;  
 
 **previous update**
 
-* * Fixed bug where SEG cannot be used to separate normals, poses, and depths, and added a button to save pose npy files;
+* Fixed bug where SEG cannot be used to separate normals, poses, and depths, and added a button to save pose npy files;
 * try add MPS support or no cuda user..
 * Add model uninstallation code for easy connection to other nodes. Thanks to @lyxkilo's code, it is possible to convert the FP32 model to an FP16 model (smaller, around 1B SEG 2G)，The first run will generate an fp16 model file with the same name, and there is no need to enable the fp16 generation button after generation.
 * 修复无法利用SEG分离法线，姿态和深度的bug，新增保存姿态npy文件按钮; 
