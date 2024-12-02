@@ -70,11 +70,12 @@ class SapiensPoseEstimation:
         # Detect persons in the image
         bboxes = self.detector.detect(img)
         
-        GOLIATH_ELBOW_HAND_KEY = ["hand", "finger", "thumb", "elbow", "wrist", "olecranon", "cubital_fossa"]
+        GOLIATH_HAND_KEY = ["hand", "finger", "thumb", "wrist",]
         GOLIATH_FACE_NECK_KEY= ["nose", "eye", "neck","ear", "labiomental", "glabella", "chin", "lash","crease","nostril","mouth","lip","helix","tragus","iris","pupil","between_22_15","concha","crus"]
         GOLIATH_LOWER_LIMBS_KEY= ["hip", "knee", "ankle", "toe", "heel"]
         GOLIATH_TORSO_KEY= ["hip", "shoulder"]
-        filter_obj_list= {"Face_Neck":GOLIATH_FACE_NECK_KEY,"Left_Hand":GOLIATH_ELBOW_HAND_KEY,"Left_Foot":GOLIATH_LOWER_LIMBS_KEY,"Torso":GOLIATH_TORSO_KEY}
+        GOLIATH_ELBOW_HAND_KEY = ["hand", "finger", "thumb", "elbow", "wrist", "olecranon", "cubital_fossa"]
+        filter_obj_list= {"Face_Neck":GOLIATH_FACE_NECK_KEY,"Left_Hand":GOLIATH_HAND_KEY,"Left_Foot":GOLIATH_LOWER_LIMBS_KEY,"Torso":GOLIATH_TORSO_KEY,"Left_Lower_Arm":GOLIATH_ELBOW_HAND_KEY}
         filter_obj_done=[]
         if filter_obj:
             select_str_list = [list(GOLIATH_CLASSES_FIX)[i].split(".")[-1] for i in filter_obj]
