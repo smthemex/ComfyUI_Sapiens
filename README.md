@@ -3,6 +3,21 @@ You can call Using Sapiens to get seg,normal,pose,depth,mask maps.
 
 Sapiens From: [facebookresearch/sapiens](https://github.com/facebookresearch/sapiens) 
 
+**Notice-2024/12/05**
+* 因为YOLO所需的ultralytics 库其特定的8.3.41Pypi版本被植入挖矿脚本，因为pose要调用YOLO，最近通过pip安装了ultralytics，请务必按以下操作查看你的ultralytics版本 ：  
+  1、comfyUI便携包，在python_embeded目录下，打开CMD，运行 python -m pip show ultralytics   
+  2、comfyUI安装版，打开CMD 运行 pip show ultralytics   
+  只要版本不是8.3.41，就无需理会，   
+* 如果ultralytics的版本是8.3.41，请务必执行pip unistall ultralytics 并清除python的Lib\site-packages\ultralytics文件夹和带ultralytics名称的文件夹
+* 如果要继续使用8.3.41，可以使用pip install git+https://github.com/ultralytics/ultralytics.git 安装，当然我建议你使用其他版本。
+* Because the ultralytics library required by YOLO has a specific 8.3.41Pypi version embedded in the mining script, and pose needs to call YOLO, ultralytics has recently been installed through pip. Please be sure to check your ultralytics version by following these steps:      
+  1. ComfyUI portable package, in the python_ embedded directory, open CMD and run： python -m pip show ultralytics  
+  2. ComfyUI installation version, open CMD and run : pip show ultralytics  
+As long as the version is not 8.3.41, there is no need to worry,  
+* If the version of ultralytics is 8.3.41, be sure to execute pip unisstall ultralytics and clear the ...Lib\site packages\ultralytics folder and folders with ultralytics names in Python   
+* If you want to continue using 8.3.41, you can use pip install git+ https://github.com/ultralytics/ultralytics.git Install, of course I suggest you use a different version.
+
+
 **Update-2024/12/01**
 * 基于COCOfullbody编码 ，单独使用pose模型时，可选pose的5种分离模式，分别是躯干，下肢，手，上肢，头部，对应选择seg_select 的编号分别是（21.torso，4.Left_foot,5.Left_Hand,6.Left_lower_arm,3.Face_Neck），这5种也可以自由组合，全选默认输出所有pose；
 * Based on COCOfullbody encoding, when using the pose model alone, five separation modes of pose can be selected, namely ' torso, lower limbs, hands,lower_arm, and head.' The corresponding selection numbers for 'seg_ select' are (21. Torso, 4. Left_Foot, 5. Left_Hand,6.Left_lower_arm, 3. Face_Neck). These five modes can also be freely combined, and selecting all will output all poses by default;  
