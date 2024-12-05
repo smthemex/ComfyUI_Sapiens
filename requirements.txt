@@ -3,5 +3,5 @@
 #opencv-python
 #cap_from_youtube
 #imread_from_url
-ultralytics
+ultralytics==8.2.84
 #huggingface_hub
