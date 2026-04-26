@@ -1,9 +1,9 @@
 [project]
 name = "comfyui_sapiens"
-description = "You can call Using Sapiens to get seg，normal，pose，depth，mask."
-version = "1.0.0"
+description = "You can call Using Sapiens or Sapiens2 to get seg，normal，pose，depth，mask,albedo，pointmap"
+version = "2.0.0"
 license = { file = "LICENSE" }
-dependencies = ["#torch", "#torchvision", "#opencv-python", "#cap_from_youtube", "#imread_from_url", "ultralytics", "#huggingface_hub"]
+dependencies = ["torch", "torchvision", "opencv-python", "#cap_from_youtube", "#imread_from_url", "ultralytics","termcolor","prettytable", "huggingface_hub"]
 
 [project.urls]
 Repository = "https://github.com/smthemex/ComfyUI_Sapiens"

@@ -21,6 +21,8 @@ device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is
 weigths_current_path = os.path.join(folder_paths.models_dir, "sapiens")
 weigths_seg_path= os.path.join(weigths_current_path, "seg")
 
+
+
 def get_path(path_name):
     if path_name != "none":
         path = folder_paths.get_full_path("sapiens", path_name)
