@@ -71,13 +71,13 @@ only support torchscript version now,you can choice 1b,0.3b,0.6b,2b,do not chang
 
 **seg body**    
 * sapiens2
-![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/examplev2.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/examplev2.png)
 
 * 可以选人体部位27种类型 Latest version        
-![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/exampleA.png)
-![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/exampleB.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/exampleA.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/exampleB.png)
 * only pose 仅使用pose模型分离躯干；  
-![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example.png) 
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/example.png) 
 
 Citation
 ------
