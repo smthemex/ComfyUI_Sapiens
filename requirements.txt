@@ -1,7 +1,9 @@
-#torch
-#torchvision
-#opencv-python
+torch
+torchvision
+opencv-python
 #cap_from_youtube
 #imread_from_url
-ultralytics==8.2.84
-#huggingface_hub
+ultralytics
+termcolor
+prettytable
+huggingface_hub
