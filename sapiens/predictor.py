@@ -33,6 +33,7 @@ class Sapiens2Predictor:
         self.no_save_json=True
         self.pose_path=pose_path
         self.pose_detector=pose_detector
+        self.no_save_predictions=True
     
     def load_model(self,device):
         self.load_device=device
@@ -43,7 +44,7 @@ class Sapiens2Predictor:
         self.model_pose=load_model(self.pose_path,self.node_dir,device) if self.pose_path else None
 
     def predict(self,image):
-        seg_img,normal_img,pointmap_img,albedo_img,mask_list=None,None,None,None,None
+        seg_img,normal_img,pointmap_img,albedo_img,mask_list,pose_img=None,None,None,None,None,None
         if self.model_seg:
             if self.load_device != self.device:# move to device
                 self.model_seg.to(self.device)
@@ -59,13 +60,13 @@ class Sapiens2Predictor:
         if self.model_normal:
             if self.load_device != self.device:# move to device
                 self.model_normal.to(self.device)
-            normal_img=normal_predict(self.model_normal,image, mask_list)
+            normal_img=normal_predict(self.model_normal,image, mask_list,self.no_black_background)
             self.model_normal.to(torch.device("cpu"))
             torch.cuda.empty_cache()
         if self.model_pointmap:
             if self.load_device != self.device:# move to device
                 self.model_pointmap.to(self.device)
-            pointmap_img=pointmap_predict(self.model_pointmap, image, mask_list)
+            pointmap_img=pointmap_predict(self.model_pointmap, image, mask_list,self.with_normal,self.no_black_background,self.no_save_predictions)
             self.model_pointmap.to(torch.device("cpu"))
         if self.model_albedo:
             if self.load_device != self.device:# move to device
@@ -151,7 +152,7 @@ def seg_predict(model, images):
         mask_list.append(mask)
     return image_list,mask_list
 
-def pointmap_predict(model, images,mask_list,):
+def pointmap_predict(model, images,mask_list,with_normal=False,no_black_background=False,no_save_predictions=True):
     try:
         import open3d as o3d
     except ImportError as e:
@@ -216,7 +217,7 @@ def pointmap_predict(model, images,mask_list,):
         depth = pointmap[:, :, 2].astype(np.float32)
         #np.save(depth_npy_path, depth.astype(np.float16))
         depth_list.append(depth)
-        if not model.no_save_predictions:
+        if not no_save_predictions:
             points = pointmap[mask > 0].reshape(-1, 3)  ## N x 3
             pc = o3d.geometry.PointCloud()
             colors = image[mask > 0] / 255.0
@@ -274,11 +275,11 @@ def pointmap_predict(model, images,mask_list,):
             depth, mask, global_min, global_max
         )
         panels = [image, processed_depth]
-        if model.with_normal:
+        if with_normal:
             normal_vis = compute_surface_normals(depth, mask, global_min, global_max)
             panels.append(normal_vis)
 
-        if model.no_black_background:
+        if no_black_background:
             for p in panels[1:]:
                 p[mask == 0] = image[mask == 0]
 
@@ -302,24 +303,6 @@ def pose_predict(model,detector,images,node_cr_path,no_save_json=True,radius=3,t
     codec_type = model.cfg.codec.pop("type")
     assert codec_type == "UDPHeatmap", "Only support UDPHeatmap"
     model.codec = UDPHeatmap(**model.cfg.codec)
-
-    # build detector
-    # detector = init_detector(args.det_config, args.det_checkpoint, device=args.device)
-    # detector.cfg = mmdet_pipeline(detector.cfg)
-
-    # Get image list
-    # if os.path.isdir(args.input):
-    #     input_dir = args.input
-    #     image_names = [
-    #         name
-    #         for name in sorted(os.listdir(input_dir))
-    #         if name.endswith((".jpg", ".png", ".jpeg"))
-    #     ]
-    # else:
-    #     with open(args.input, "r") as f:
-    #         image_paths = [line.strip() for line in f if line.strip()]
-    #     image_names = [os.path.basename(path) for path in image_paths]
-    #     input_dir = os.path.dirname(image_paths[0])
 
     frames_records = []
     image_size = None
@@ -377,9 +360,7 @@ def pose_predict(model,detector,images,node_cr_path,no_save_json=True,radius=3,t
     return pose_list
 
 
-
-
-def normal_predict(model,images, mask_list,):
+def normal_predict(model,images, mask_list,no_black_background=True):
 
     image_list = []
     if mask_list is None:
@@ -420,15 +401,13 @@ def normal_predict(model,images, mask_list,):
         normal_vis = ((normal + 1) / 2 * 255).astype(np.uint8)
         normal_vis = normal_vis[:, :, ::-1]
 
-        if model.no_black_background:
+        if no_black_background:
             normal_vis[mask == 0] = image[mask == 0]
 
         normal_vis_rgb = cv2.cvtColor(normal_vis, cv2.COLOR_BGR2RGB) 
         image = torch.from_numpy(normal_vis_rgb.astype(np.float32) / 255.0).unsqueeze(0)
         image_list.append(image)
     return  image_list
-
-
 
 
 def load_model(checkpoint,node_dir,device):
@@ -508,19 +487,6 @@ def init_model(
 
 def process_one_image(image, detector, model):
     image_w, image_h = image.shape[1], image.shape[0]
-    #det_result = inference_detector(detector, image)
-   
-
-    # pred_instance = det_result.pred_instances.cpu().numpy()
-    # bboxes = np.concatenate(
-    #     (pred_instance.bboxes, pred_instance.scores[:, None]), axis=1
-    # )
-    # bboxes = bboxes[
-    #     np.logical_and(
-    #         pred_instance.labels == 0,  ## 0 is the person class
-    #         pred_instance.scores > args.bbox_thr,
-    #     )
-    # ]
 
     # bboxes = bboxes[nms(bboxes, args.nms_thr), :4]  ## B x 4; x1, y1, x2, y2
     bboxes=detector(image) # use yolo to detect the person
