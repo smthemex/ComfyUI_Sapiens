@@ -48,7 +48,7 @@ class Sapiens2Predictor:
         if self.model_seg:
             if self.load_device != self.device:# move to device
                 self.model_seg.to(self.device)
-            seg_img,mask_list= seg_predict(self.model_seg,image) # list ,list of labels
+            seg_img,mask_list= seg_predict(self.model_seg,image,self.class_palette_type) # list ,list of labels
             self.model_seg.to(torch.device("cpu"))
             torch.cuda.empty_cache()
         if self.model_pose:
@@ -122,9 +122,9 @@ def albedo_predict(model, images,mask_list):
 
 
 
-def seg_predict(model, images):
+def seg_predict(model, images,class_palette_type="dome29"):
     #class_palette_type = args.class_palette_type
-    visualizer = SegVisualizer(class_palette_type=model.class_palette_type, with_labels=False)
+    visualizer = SegVisualizer(class_palette_type=class_palette_type, with_labels=False)
     image_list=[]
     mask_list=[]
     for i, image in tqdm(enumerate(images), total=len(images)):
