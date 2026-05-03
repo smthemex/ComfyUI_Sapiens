@@ -114,8 +114,9 @@ class SapiensLoader(io.ComfyNode):
             normal_path = folder_paths.get_full_path("sapiens",normal) if normal != "none" else None
             albedo_path = folder_paths.get_full_path("sapiens",albedo) if albedo != "none" else None
             pose_path = folder_paths.get_full_path("sapiens",pose) if pose != "none" else None
-            
             pose_detector=Detector() if pose_path is not None else None
+            if pointmap_path is not None and seg_path is None:
+                raise("pointmap need segment model to get mask,please select a segment model")
             model=Sapiens2Predictor(seg_path,pointmap_path,albedo_path,normal_path,pose_path,pose_detector,node_cr_path,device)
             model.load_model(torch.device("cpu")) # keep model on cpu
             model.remove_bg=remove_bg
@@ -233,5 +234,6 @@ class SapiensSampler(io.ComfyNode):
             pose_img=zero_tensor if pose_img is None else torch.cat(pose_img, dim=0)
             seg_img=zero_tensor if seg_img is None else torch.cat(seg_img, dim=0)
             normal_img=zero_tensor if normal_img is None else torch.cat(normal_img, dim=0)
+            pointmap_img=zero_tensor if pointmap_img is None else torch.cat(pointmap_img, dim=0)
         print(f"ALL inference took: {time.perf_counter() - start:.4f} seconds")
         return io.NodeOutput(seg_img,pose_img, depth_img, normal_img,pointmap_img,albedo_img, mask)
