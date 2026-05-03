@@ -6,6 +6,7 @@ Sapiens2 From: [facebookresearch/sapiens2](https://github.com/facebookresearch/s
 
 Update
 ----
+* fix pointmap error.
 * Add support for sapiens2,albedo checkpoint is not available yet, 支持sapiens2，注意albedo 目前没有
 
 previous update
@@ -71,6 +72,7 @@ only support torchscript version now,you can choice 1b,0.3b,0.6b,2b,do not chang
 
 **seg body**    
 * sapiens2
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/sapiens_p.png)
 ![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/examplev2.png)
 
 * 可以选人体部位27种类型 Latest version        
