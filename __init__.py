@@ -1,7 +1,7 @@
 
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
-from .sapiens_node import SapiensLoader,SapiensSampler
+from .sapiens_node import SapiensLoader,SapiensSampler,SapiensSplit
 
 class Sapiens_SM_Extension(ComfyExtension):
     @override
@@ -9,6 +9,7 @@ class Sapiens_SM_Extension(ComfyExtension):
         return [
             SapiensLoader,
             SapiensSampler,
+            SapiensSplit,
         ]
 async def comfy_entrypoint() -> Sapiens_SM_Extension:
     return Sapiens_SM_Extension()

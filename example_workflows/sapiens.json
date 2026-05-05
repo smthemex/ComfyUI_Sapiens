@@ -1,42 +1,15 @@
 {
   "id": "cbb4e78f-afc8-4d3d-b69c-2ac804e6d853",
   "revision": 0,
-  "last_node_id": 24,
-  "last_link_id": 31,
+  "last_node_id": 33,
+  "last_link_id": 45,
   "nodes": [
-    {
-      "id": 24,
-      "type": "SaveImage",
-      "pos": [
-        7624.965887306024,
-        -76.94099235407764
-      ],
-      "size": [
-        270,
-        270
-      ],
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 31
-        }
-      ],
-      "outputs": [],
-      "properties": {},
-      "widgets_values": [
-        "ComfyUI"
-      ]
-    },
     {
       "id": 15,
       "type": "LoadImage",
       "pos": [
-        7154.93615320489,
-        216.64701408306888
+        7193.995065909646,
+        196.09369314665832
       ],
       "size": [
         315,
@@ -51,7 +24,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            26
+            36
           ]
         },
         {
@@ -69,15 +42,50 @@
       ]
     },
     {
-      "id": 20,
-      "type": "SapiensLoader",
+      "id": 28,
+      "type": "MaskToImage",
       "pos": [
-        6830.637699175139,
-        -136.44091150889224
+        7598.140453242966,
+        129.39983081991844
       ],
       "size": [
-        296.625,
-        416.75
+        140,
+        26
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 39
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MaskToImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 26,
+      "type": "SapiensSplit",
+      "pos": [
+        6893.529034367357,
+        -160.97387145032837
+      ],
+      "size": [
+        270,
+        754
       ],
       "flags": {},
       "order": 1,
@@ -85,10 +93,97 @@
       "inputs": [],
       "outputs": [
         {
+          "name": "conds",
+          "type": "CONDITIONING",
+          "links": [
+            38
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SapiensSplit"
+      },
+      "widgets_values": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "id": 24,
+      "type": "SaveImage",
+      "pos": [
+        7640.069448097352,
+        -350.00522259382177
+      ],
+      "size": [
+        270,
+        270
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 37
+        }
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "ComfyUI"
+      ]
+    },
+    {
+      "id": 30,
+      "type": "SapiensLoader",
+      "pos": [
+        6514.293711691435,
+        -155.081611057885
+      ],
+      "size": [
+        324.78625506417484,
+        298
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
           "name": "model",
           "type": "MODEL",
           "links": [
-            27
+            41
           ]
         }
       ],
@@ -96,59 +191,118 @@
         "Node name for S&R": "SapiensLoader"
       },
       "widgets_values": [
-        "none",
+        "sapiens2_1b_seg.safetensors",
         "none",
         "none",
         "sapiens2_1b_pose.safetensors",
         "none",
         "none",
-        "float32_torch",
+        "float32",
         0.5,
         false,
-        false,
-        false,
-        true,
         false,
         true
       ]
     },
     {
-      "id": 19,
-      "type": "SapiensSampler",
+      "id": 33,
+      "type": "PreviewImage",
       "pos": [
-        7188.976643210286,
-        -144.3821862426911
+        7955.236504364157,
+        -331.2229928719393
       ],
       "size": [
-        295.67359132853926,
-        298
+        140,
+        246
       ],
       "flags": {},
-      "order": 2,
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 45
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 29,
+      "type": "PreviewImage",
+      "pos": [
+        7816.909833138077,
+        164.4997850375511
+      ],
+      "size": [
+        252.81597106760637,
+        268.98095646519005
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 40
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 27,
+      "type": "SapiensSampler",
+      "pos": [
+        7207.277323459651,
+        -135.951503114201
+      ],
+      "size": [
+        293.74067561811535,
+        275.63995357639874
+      ],
+      "flags": {},
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 27
+          "link": 41
         },
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 26
+          "link": 36
+        },
+        {
+          "name": "cond",
+          "shape": 7,
+          "type": "CONDITIONING",
+          "link": 38
         }
       ],
       "outputs": [
         {
           "name": "seg_img",
           "type": "IMAGE",
-          "links": []
+          "links": [
+            37
+          ]
         },
         {
           "name": "pose_img",
           "type": "IMAGE",
           "links": [
-            31
+            45
           ]
         },
         {
@@ -164,7 +318,7 @@
         {
           "name": "pointmap_img",
           "type": "IMAGE",
-          "links": null
+          "links": []
         },
         {
           "name": "albedo_img",
@@ -174,16 +328,16 @@
         {
           "name": "mask",
           "type": "MASK",
-          "links": []
+          "links": [
+            39
+          ]
         }
       ],
       "properties": {
         "Node name for S&R": "SapiensSampler"
       },
       "widgets_values": [
-        "none",
-        "",
-        true,
+        false,
         255,
         255,
         255
@@ -192,26 +346,58 @@
   ],
   "links": [
     [
-      26,
+      36,
       15,
       0,
-      19,
+      27,
       1,
       "IMAGE"
     ],
     [
+      37,
       27,
-      20,
       0,
-      19,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      38,
+      26,
+      0,
+      27,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      39,
+      27,
+      6,
+      28,
+      0,
+      "MASK"
+    ],
+    [
+      40,
+      28,
+      0,
+      29,
+      0,
+      "IMAGE"
+    ],
+    [
+      41,
+      30,
+      0,
+      27,
       0,
       "MODEL"
     ],
     [
-      31,
-      19,
+      45,
+      27,
       1,
-      24,
+      33,
       0,
       "IMAGE"
     ]
@@ -220,10 +406,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.9820282413350482,
+      "scale": 0.7658485793655827,
       "offset": [
-        -6459.518381287274,
-        269.8644717480644
+        -6209.312441830627,
+        575.7920657582733
       ]
     },
     "frontendVersion": "1.42.11"

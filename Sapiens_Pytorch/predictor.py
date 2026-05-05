@@ -1,17 +1,15 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
-import math
+from tqdm import tqdm
 from dataclasses import dataclass
 import cv2
 import numpy as np
 import torch
-from PIL import Image
-from .depth import SapiensDepth, SapiensDepthType, draw_depth_map, DepthSapiens
-from .segmentation import SapiensSegmentation, SapiensSegmentationType, draw_segmentation_map, SapiensSeg
-from .normal import SapiensNormal, SapiensNormalType, draw_normal_map, NormalSapiens
+from .depth import SapiensDepthType,  DepthSapiens
+from .segmentation import  SapiensSegmentationType, SapiensSeg
+from .normal import SapiensNormalType, NormalSapiens
 from .pose import SapiensPoseEstimationType, SapiensPoseEstimation
-from .detector import Detector
-from .common import get_mask,aplly_seg
+from .common import aplly_seg
 
 
 @dataclass
@@ -96,230 +94,79 @@ class SapiensPredictor:
         
         self.show_pose_object = config.show_pose_object
         self.remove_bg = config.remove_bg
-        self.use_pellete = config.use_pellete
         
         self.pt_type = config.pt_type
         self.model_dir = config.model_dir
         
-        self.normal_predictor = SapiensNormal(config.normal_type, self.local_normal, self.pt_type, self.model_dir,
-                                              self.img_size, self.use_torchscript_normal, config.device,
-                                              config.dtype) if self.has_normal and not self.use_pellete else None
-        self.segmentation_predictor = SapiensSegmentation(config.segmentation_type, self.local_seg, self.pt_type,
-                                                          self.model_dir, self.img_size, self.use_torchscript_seg,
-                                                          config.device,
-                                                          config.dtype) if self.has_seg and not self.use_pellete else None
-        
-        self.depth_predictor = SapiensDepth(config.depth_type, self.local_depth, self.pt_type, self.model_dir,
-                                            self.img_size, self.use_torchscript_depth, config.device,
-                                            config.dtype) if self.has_depth and not self.use_pellete else None
-        
         self.pose_predictor = SapiensPoseEstimation(config.pose_type, self.local_pose, self.pt_type, self.model_dir,
                                                     self.img_size, self.use_torchscript_pose, self.show_pose_object,
                                                     config.device, config.dtype) if self.has_pose else None
-        
         self.seg_pred = SapiensSeg(config.segmentation_type, self.local_seg, self.pt_type, self.model_dir,
                                    self.use_torchscript_seg,
-                                   config.dtype) if self.has_seg and self.use_pellete else None
+                                   config.dtype) if self.has_seg  else None
         self.depth_pred = DepthSapiens(config.depth_type, self.local_depth, self.pt_type, self.model_dir,
                                        self.use_torchscript_seg,
-                                       config.dtype) if self.has_depth and self.use_pellete else None
+                                       config.dtype) if self.has_depth  else None
         self.normal_pred = NormalSapiens(config.normal_type, self.local_normal, self.pt_type, self.model_dir,
                                          self.use_torchscript_seg,
-                                         config.dtype) if self.has_normal and self.use_pellete else None
+                                         config.dtype) if self.has_normal  else None
         
-        self.detector = config.detector  # Detector(config.detector_config) #TODO: Cropping seems to make the results worse
+        self.detector = None
     
     def __call__(self, img: np.ndarray, select_obj, RGB_BG):
         return self.predict(img, select_obj, RGB_BG)
     
     def enable_model_cpu_offload(self):
         if self.has_seg:
-            if self.use_pellete:
-                self.seg_pred.enable_model_cpu_offload()
-            else:
-                self.segmentation_predictor.enable_model_cpu_offload()
+            self.seg_pred.enable_model_cpu_offload()
         if self.has_normal:
-            if self.use_pellete:
-                self.normal_pred.enable_model_cpu_offload()
-            
-            else:
-                self.normal_predictor.enable_model_cpu_offload()
+            self.normal_pred.enable_model_cpu_offload()
         if self.has_depth:
-            if self.use_pellete:
-                self.depth_pred.enable_model_cpu_offload()
-            
-            else:
-                self.depth_predictor.enable_model_cpu_offload()
+            self.depth_pred.enable_model_cpu_offload()
         if self.has_pose:
             self.pose_predictor.enable_model_cpu_offload()
     
     def move_to_cuda(self):
-        if self.has_seg:
-            if self.use_pellete:
-                self.seg_pred.move_to_cuda()
-            else:
-                self.segmentation_predictor.move_to_cuda()
-        if self.has_normal:
-            if self.use_pellete:
-                self.normal_pred.move_to_cuda()
-            else:
-                self.normal_predictor.move_to_cuda()
+        if self.has_seg:        
+            self.seg_pred.move_to_cuda()      
+        if self.has_normal:     
+            self.normal_pred.move_to_cuda()   
         if self.has_depth:
-            if self.use_pellete:
-                self.depth_pred.move_to_cuda()
-            else:
-                self.depth_predictor.move_to_cuda()
+            self.depth_pred.move_to_cuda()
         if self.has_pose:
             self.pose_predictor.move_to_cuda()
     
-    def predict(self, img, select_obj, RGB_BG):  # PIL.Image when use pellete ,np.ndarray
-        if self.use_pellete:
-            seg_list = []
-            depth_list = []
-            normal_list = []
-            pose_list = []
-            seg_mask = []
+    def predict(self, images, select_obj, RGB_BG):  # PIL.Image when use pellete ,np.ndarray
+        seg_list,depth_list,normal_list,pose_list,mask_list=[],[],[],[],[]
+        for img in tqdm(images, total=len(images)):
             if self.has_seg:
                 seg_map, mask_map, seg_preds = self.seg_pred(img, select_obj, RGB_BG)
-                seg_list = [seg_map]
-                seg_mask = [mask_map]
+                seg_list.append(np2tensor(seg_map,False))
+                mask_list.append(mask_map)
             seg_in = seg_preds if self.has_seg else None
             if self.has_depth:
-                depth_list = [self.depth_pred(img, self.has_seg, seg_in, select_obj,RGB_BG)]
+                depth_map=self.depth_pred(img, self.has_seg, seg_in, select_obj,RGB_BG)
+                depth_list.append(np2tensor(depth_map,False))
             if self.has_normal:
-                normal_list = [self.normal_pred(img, self.has_seg, seg_in,select_obj, RGB_BG)]
+                normal_map=self.normal_pred(img, self.has_seg, seg_in,select_obj, RGB_BG)
+                normal_list.append(np2tensor(normal_map,False))
             if self.has_pose:  # pil-cv-pil,keypoint can save
                 filter_obj=select_obj.copy() if not self.has_seg and select_obj else None # only useful when no seg and select_obj
-              
-                pose_result_image, keypoints,box_size = self.pose_predictor(np.array(img),filter_obj)
-                # for i in keypoints:
-                #     left_ear = i["left_ear"]  if i.get("left_ear")  != None else None
-                #     right_ear = i["right_ear"]  if i.get("right_ear")  != None else None
-                #     if right_ear and left_ear:
-                #         distance = math.pow((int(right_ear[0] * box_size[0] / 192) - int(left_ear[0] * box_size[1] / 256)),
-                #                             2) + math.pow(
-                #             (int(right_ear[1] * box_size[0] / 256) - int(left_ear[1] * box_size[1] / 256)), 2)
-                #         distance = math.sqrt(distance)
-                        
+                pose_result_image, keypoints,box_size = self.pose_predictor(np.array(img),filter_obj)        
                 if self.has_seg:
-                    pose_result_image=aplly_seg(Image.fromarray(pose_result_image),seg_in,select_obj,[0,0,0])
-  
-                pose_list = [convert_from_cv2_to_image(pose_result_image)]
-            return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
-        else:
-            img_shape = img.shape  # 768, 1024, 3 np.ndarray
-            if self.detector is not None:
-                print("Detecting people...")
-                person_boxes = self.detector.detect(img)
-                person_boxes = filter_small_boxes(person_boxes, img_shape[0], self.minimum_person_height)
-                
-                if len(person_boxes) == 0:
-                    # return img
-                    raise "no person in img"
-                
-                person_boxes = expand_boxes(person_boxes, img_shape)
-                print(f"{len(person_boxes)} people detected, predicting maps...")
-            else:
-                person_boxes = [[0, 0, img_shape[1], img_shape[0]], ]
-            
-            normal_maps = []
-            segmentation_maps = []
-            depth_maps = []
-            pose_maps = []
-            
-            for box in person_boxes:
-                crop = img[box[1]:box[3], box[0]:box[2]]
-                if self.has_seg:
-                    segmentation_maps.append(self.segmentation_predictor(crop))
-                if self.has_normal:
-                    normal_maps.append(self.normal_predictor(crop))
-                if self.has_depth:
-                    depth_maps.append(self.depth_predictor(crop))
-                if self.has_pose:
-                    pose_maps.append(self.pose_predictor(crop,select_obj))  # tuple
-            
-            return self.draw_maps(img, person_boxes, normal_maps, segmentation_maps, depth_maps, pose_maps, RGB_BG)
+                    pose_result_image=aplly_seg(cv2.cvtColor(pose_result_image, cv2.COLOR_BGR2RGB),seg_in,select_obj,[0,0,0])
+                pose_list.append(np2tensor(pose_result_image,False))        
+        return seg_list , depth_list, normal_list, pose_list , mask_list
     
-    # TODO: Clean this up
-    def draw_maps(self, img, person_boxes, normal_maps, segmentation_maps, depth_maps, pose_maps, RGB_BG):
-        seg_list = []
-        seg_mask = []
-        if self.has_seg:
-            segmentation_img = img.copy()
-            empty_cv = np.empty(segmentation_img.shape, dtype=np.uint8)
-            empty_cv[:] = RGB_BG
-            for segmentation_map, box in zip(segmentation_maps, person_boxes):
-                mask = segmentation_map > 0
-                origin = segmentation_img[box[1]:box[3], box[0]:box[2]]
-                crop = empty_cv if self.remove_bg else origin
-                segmentation_draw = draw_segmentation_map(segmentation_map)
-                real_mask = get_mask(segmentation_draw)
-                segmentation_img[box[1]:box[3], box[0]:box[2]] = origin * mask[..., None] + crop * ~mask[..., None]
-            seg_list.append(segmentation_img)
-            seg_mask.append(real_mask)
-        
-        normal_list = []
-        if self.has_normal:
-            normal_img = img.copy()
-            empty_cv = np.empty(normal_img.shape, dtype=np.uint8)
-            empty_cv[:] = RGB_BG
-            if self.has_seg:
-                for i, (normal_map, box) in enumerate(zip(normal_maps, person_boxes)):
-                    mask = segmentation_maps[i] > 0
-                    crop = empty_cv if self.remove_bg else normal_img[box[1]:box[3], box[0]:box[2]]
-                    normal_draw = draw_normal_map(normal_map)
-                    crop_draw = cv2.addWeighted(crop, 0.5, normal_draw, 0.7, 0)
-                    normal_img[box[1]:box[3], box[0]:box[2]] = crop_draw * mask[..., None] + crop * ~mask[..., None]
-                normal_list.append(normal_img)
-            else:
-                for i, (normal_map, box) in enumerate(zip(normal_maps, person_boxes)):
-                    normal_img = draw_normal_map(normal_map)
-                normal_list.append(normal_img)
-        
-        depth_list = []
-        if self.has_depth:
-            depth_img = img.copy()
-            empty_cv = np.empty(depth_img.shape, dtype=np.uint8)
-            empty_cv[:] = RGB_BG  # (255, 255, 255)
-            if self.has_seg:
-                for i, (depth_map, box) in enumerate(zip(depth_maps, person_boxes)):
-                    mask = segmentation_maps[i] > 0
-                    crop = empty_cv if self.remove_bg else depth_img[box[1]:box[3], box[0]:box[2]]
-                    depth_map[~mask] = 0
-                    depth_draw = draw_depth_map(depth_map)
-                    crop_draw = cv2.addWeighted(crop, 0.5, depth_draw, 0.7, 0)
-                    depth_img[box[1]:box[3], box[0]:box[2]] = crop_draw * mask[..., None] + crop * ~mask[..., None]
-                depth_list.append(depth_img)
-            else:
-                for i, (depth_map, box) in enumerate(zip(depth_maps, person_boxes)):
-                    depth_img = draw_depth_map(depth_map)
-                depth_list.append(depth_img)
-        
-        pose_list = []
-        if self.has_pose:
-            pose_img = img.copy()
-            empty_cv = np.empty(pose_img.shape, dtype=np.uint8)
-            empty_cv[:] = RGB_BG  # (0, 0, 0)
-            if self.has_seg:
-                for i, (pose_map, box) in enumerate(
-                        zip(pose_maps, person_boxes)):  # pose_maps:tuple(result_img, all_keypoints)
-                    mask = segmentation_maps[i] > 0
-                    crop = empty_cv if self.remove_bg else pose_img[box[1]:box[3], box[0]:box[2]]
-                    pose_map[0][~mask] = 0
-                    pose_img[box[1]:box[3], box[0]:box[2]] = pose_map[0] * mask[..., None] + crop * ~mask[..., None]
-                pose_list.append(pose_img)
-            else:
-                for i, (pose_map, box) in enumerate(zip(pose_maps, person_boxes)):
-                    pose_img = pose_map[0]
-                pose_list.append(pose_img)
-        return seg_list if seg_list else None, depth_list if depth_list else None, normal_list if normal_list else None, pose_list if pose_list else None, seg_mask if seg_list else None
 
 
-def convert_from_image_to_cv2(img: Image) -> np.ndarray:
-    # return np.asarray(img)
-    return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-
-
-def convert_from_cv2_to_image(img: np.ndarray) -> Image:
-    # return Image.fromarray(img)
-    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+def np2tensor(img,need_convert=True):
+    """
+    Convert numpy array to comfy torch tensor.
+    BGR-->RGB
+    HWC-->BHWC
+    """
+    if need_convert:  
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
+    img = torch.from_numpy(img.astype(np.float32) / 255.0).unsqueeze(0)
+    return img

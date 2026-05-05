@@ -14,10 +14,10 @@ import torch.nn.functional as F
 from .dense.src.visualizers import SegVisualizer
 from .pose.tools.vis.pose_render_utils import visualize_keypoints
 from .pose.src.datasets import parse_pose_metainfo, UDPHeatmap
-
+from .classes_and_palettes import GOLIATH_PALETTE, GOLIATH_CLASSES
 
 class Sapiens2Predictor:
-    def __init__(self,seg_path,pointmap_path,albedo_path,normal_path,pose_path,pose_detector,node_dir,device):
+    def __init__(self,seg_path,pointmap_path,albedo_path,normal_path,pose_path,pose_detector,node_dir,device,dtype):
         self.seg_path=seg_path
         self.pointmap_path=pointmap_path
         self.albedo_path=albedo_path
@@ -34,52 +34,65 @@ class Sapiens2Predictor:
         self.pose_path=pose_path
         self.pose_detector=pose_detector
         self.no_save_predictions=True
+        self.dtype=dtype
+        self.show_pose_object=False
     
     def load_model(self,device):
         self.load_device=device
-        self.model_seg=load_model(self.seg_path,self.node_dir,device) if self.seg_path else None
-        self.model_pointmap=load_model(self.pointmap_path,self.node_dir,device) if self.pointmap_path else None
-        self.model_albedo=load_model(self.albedo_path,self.node_dir,device) if self.albedo_path else None
-        self.model_normal=load_model(self.normal_path,self.node_dir,device) if self.normal_path else None
-        self.model_pose=load_model(self.pose_path,self.node_dir,device) if self.pose_path else None
+        self.model_seg=load_model(self.seg_path,self.node_dir,device,self.dtype) if self.seg_path else None
+        self.model_pointmap=load_model(self.pointmap_path,self.node_dir,device,self.dtype) if self.pointmap_path else None
+        self.model_albedo=load_model(self.albedo_path,self.node_dir,device,self.dtype) if self.albedo_path else None
+        self.model_normal=load_model(self.normal_path,self.node_dir,device,self.dtype) if self.normal_path else None
+        self.model_pose=load_model(self.pose_path,self.node_dir,device,self.dtype) if self.pose_path else None
 
-    def predict(self,image):
-        seg_img,normal_img,pointmap_img,albedo_img,mask_list,pose_img=None,None,None,None,None,None
+    def predict(self,image,cond, RGB_BG):
+        seg_img,normal_img,pointmap_img,albedo_img,mask_list,pose_img=[],[],[],[],[],[]
         if self.model_seg:
             if self.load_device != self.device:# move to device
                 self.model_seg.to(self.device)
-            seg_img,mask_list= seg_predict(self.model_seg,image,self.class_palette_type) # list ,list of labels
+            seg_img,mask_list= seg_predict(self.model_seg,image,cond, RGB_BG,self.class_palette_type) # list ,list of labels
             self.model_seg.to(torch.device("cpu"))
             torch.cuda.empty_cache()
         if self.model_pose:
             if self.load_device != self.device:# move to device
                 self.model_pose.to(self.device)
-            pose_img=pose_predict(self.model_pose,self.pose_detector,image,self.node_dir,)
+            num_keypoints = self.model_pose.cfg.num_keypoints
+            if num_keypoints == 308:
+                self.model_pose.pose_metainfo = parse_pose_metainfo(
+                    dict(from_file=os.path.join(self.node_dir, "sapiens/pose/configs/_base_/keypoints308.py"))
+                )
+            ## add codec to model
+            if  self.model_pose.cfg.codec.get("type",False):
+                codec_type = self.model_pose.cfg.codec.pop("type")
+                assert codec_type == "UDPHeatmap", "Only support UDPHeatmap"
+            self.model_pose.codec = UDPHeatmap(**self.model_pose.cfg.codec)
+            pose_img=pose_predict(self.model_pose,self.pose_detector,image,mask_list,cond, RGB_BG,self.show_pose_object)
             self.model_pose.to(torch.device("cpu"))
             torch.cuda.empty_cache()
         if self.model_normal:
             if self.load_device != self.device:# move to device
                 self.model_normal.to(self.device)
-            normal_img=normal_predict(self.model_normal,image, mask_list,self.no_black_background)
+            normal_img=normal_predict(self.model_normal,image, mask_list,cond, RGB_BG,self.no_black_background)
             self.model_normal.to(torch.device("cpu"))
             torch.cuda.empty_cache()
         if self.model_pointmap:
             if self.load_device != self.device:# move to device
                 self.model_pointmap.to(self.device)
-            pointmap_img=pointmap_predict(self.model_pointmap, image, mask_list,self.with_normal,self.no_black_background,self.no_save_predictions)
+            assert mask_list , "mask_list should not be [],you need load seg model first"
+            pointmap_img=pointmap_predict(self.model_pointmap, image, mask_list,cond, RGB_BG,self.with_normal,self.no_black_background,self.no_save_predictions)
             self.model_pointmap.to(torch.device("cpu"))
         if self.model_albedo:
             if self.load_device != self.device:# move to device
                    self.model_albedo.to(self.device)
-            albedo_img=albedo_predict(self.model_albedo, image, mask_list)
+            albedo_img=albedo_predict(self.model_albedo, image, mask_list,cond, RGB_BG,)
             self.model_albedo.to(torch.device("cpu"))
         
         return seg_img,normal_img,pointmap_img,albedo_img,pose_img,mask_list
 
 
-def albedo_predict(model, images,mask_list):
+def albedo_predict(model, images,mask_list,select_obj,RGB_BG,):
     image_list = []
-    if mask_list is None:
+    if not  mask_list :
         mask_list = [None] * len(images)
     for image,mask in tqdm(zip(images,mask_list), total=len(images)):
         if mask is None:
@@ -114,15 +127,14 @@ def albedo_predict(model, images,mask_list):
         albedo = (albedo * 255).astype(np.uint8)
         albedo[mask == 0] = [100, 100, 100]
 
+        if select_obj:
+            albedo=aplly_seg_bg_color(albedo,mask,RGB_BG)
         image = torch.from_numpy(albedo.astype(np.float32) / 255.0).unsqueeze(0)
         image_list.append(image)
 
     return image_list
 
-
-
-
-def seg_predict(model, images,class_palette_type="dome29"):
+def seg_predict(model, images,cond, RGB_BG,class_palette_type="dome29"):
     #class_palette_type = args.class_palette_type
     visualizer = SegVisualizer(class_palette_type=class_palette_type, with_labels=False)
     image_list=[]
@@ -146,13 +158,18 @@ def seg_predict(model, images,class_palette_type="dome29"):
         vis_seg = visualizer._visualize_segmentation(image, pred_labels)
 
         vis_seg_rgb = cv2.cvtColor(vis_seg, cv2.COLOR_BGR2RGB) 
-        image = torch.from_numpy(vis_seg_rgb.astype(np.float32) / 255.0).unsqueeze(0)
-        image_list.append(image)
+       
         mask=(pred_labels > 0).astype(bool)
+        if cond:
+            vis_seg_rgb,mask=aplly_seg_(cv2.cvtColor(image, cv2.COLOR_BGR2RGB) ,pred_labels,cond,RGB_BG)
+            mask=mask.astype(bool)
+        image = torch.from_numpy(vis_seg_rgb.astype(np.float32) / 255.0).unsqueeze(0)
+
+        image_list.append(image)
         mask_list.append(mask)
     return image_list,mask_list
 
-def pointmap_predict(model, images,mask_list,with_normal=False,no_black_background=False,no_save_predictions=True):
+def pointmap_predict(model, images,mask_list,select_obj,RGB_BG,with_normal=False,no_black_background=False,no_save_predictions=True):
     try:
         import open3d as o3d
     except ImportError as e:
@@ -286,33 +303,38 @@ def pointmap_predict(model, images,mask_list,with_normal=False,no_black_backgrou
         #vis_image = np.concatenate(panels, axis=1)
         #cv2.imwrite(f"{base_path}{os.path.splitext(image_name)[1]}", vis_image)
         processed_depth = cv2.cvtColor(processed_depth, cv2.COLOR_BGR2RGB) 
+        if select_obj:
+            processed_depth=aplly_seg_bg_color(processed_depth,mask,RGB_BG)
         processed_depth = torch.from_numpy(processed_depth.astype(np.float32) / 255.0).unsqueeze(0)
         processed_depth_list.append(processed_depth)
     return processed_depth_list
 
 
-def pose_predict(model,detector,images,node_cr_path,no_save_json=True,radius=3,thickness=1,kpt_thr=0.3):
+def pose_predict(model,detector,images,mask_list,select_obj,RGB_BG,show_pose_object,no_save_json=True,radius=3,thickness=1,kpt_thr=0.3):
         ## add pose metainfo to model
 
-    num_keypoints = model.cfg.num_keypoints
-    if num_keypoints == 308:
-        model.pose_metainfo = parse_pose_metainfo(
-            dict(from_file=os.path.join(node_cr_path, "sapiens/pose/configs/_base_/keypoints308.py"))
-        )
-    ## add codec to model
-    codec_type = model.cfg.codec.pop("type")
-    assert codec_type == "UDPHeatmap", "Only support UDPHeatmap"
-    model.codec = UDPHeatmap(**model.cfg.codec)
+    # num_keypoints = model.cfg.num_keypoints
+    # if num_keypoints == 308:
+    #     model.pose_metainfo = parse_pose_metainfo(
+    #         dict(from_file=os.path.join(node_cr_path, "sapiens/pose/configs/_base_/keypoints308.py"))
+    #     )
+    # ## add codec to model
+    # codec_type = model.cfg.codec.get("type")
+    # assert codec_type == "UDPHeatmap", "Only support UDPHeatmap"
+    # model.codec = UDPHeatmap(**model.cfg.codec)
 
     frames_records = []
     image_size = None
     num_keypoints_seen = None
     pose_list = []
-    for i, image in tqdm(enumerate(images), total=len(images)):
+    if not mask_list :
+        mask_list = [None] * len(images)
+    for i, (image,mask) in tqdm(enumerate(zip(images,mask_list)), total=len(images)):
     #for image_name in tqdm(image_names, total=len(image_names)):
         # image_path = os.path.join(input_dir, image_name)
         # image = cv2.imread(image_path)
-
+        if mask is None:
+            mask = np.ones_like(image[:, :, 0], dtype=bool)
         try:
             keypoints, keypoint_scores, bboxes = process_one_image(
                  image, detector, model
@@ -327,6 +349,11 @@ def pose_predict(model,detector,images,node_cr_path,no_save_json=True,radius=3,t
             num_keypoints_seen = int(np.asarray(keypoints[0]).shape[0])
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        if not show_pose_object:
+            image_rgb = np.full(image_rgb.shape, RGB_BG, dtype=np.uint8)
+            #print(image_rgb.shape)
+        
         vis_image_rgb = visualize_keypoints(
             image=image_rgb,
             keypoints=keypoints,
@@ -339,6 +366,9 @@ def pose_predict(model,detector,images,node_cr_path,no_save_json=True,radius=3,t
             kpt_color=model.pose_metainfo["keypoint_colors"],
             link_color=model.pose_metainfo["skeleton_link_colors"],
         )
+
+        if select_obj:
+            vis_image_rgb=aplly_seg_bg_color(vis_image_rgb,mask,RGB_BG)
 
         vis_image_rgb=torch.from_numpy(vis_image_rgb.astype(np.float32) / 255.0).unsqueeze(0)
         pose_list.append(vis_image_rgb)
@@ -360,10 +390,10 @@ def pose_predict(model,detector,images,node_cr_path,no_save_json=True,radius=3,t
     return pose_list
 
 
-def normal_predict(model,images, mask_list,no_black_background=True):
+def normal_predict(model,images, mask_list,select_obj,RGB_BG,no_black_background=True):
 
     image_list = []
-    if mask_list is None:
+    if not mask_list :
         mask_list = [None] * len(images)
     for image,mask in tqdm(zip(images,mask_list), total=len(images)):
         if mask is None:
@@ -405,16 +435,19 @@ def normal_predict(model,images, mask_list,no_black_background=True):
             normal_vis[mask == 0] = image[mask == 0]
 
         normal_vis_rgb = cv2.cvtColor(normal_vis, cv2.COLOR_BGR2RGB) 
+        if select_obj:
+            normal_vis_rgb=aplly_seg_bg_color(normal_vis_rgb,mask,RGB_BG)
         image = torch.from_numpy(normal_vis_rgb.astype(np.float32) / 255.0).unsqueeze(0)
         image_list.append(image)
     return  image_list
 
 
-def load_model(checkpoint,node_dir,device):
+def load_model(checkpoint,node_dir,device,dtype):
     model_name,model_type=Path(checkpoint).stem.rsplit('_', 1)
     print(f"Loading model: {model_name}, {model_type} from checkpoint")
     config = get_config_path(model_name,model_type, node_dir)
     model = init_model(config, checkpoint, device=device)
+    model=model.to(dtype)
     return model
 
 def get_config_path(model_name,model_type,node_dir):
@@ -536,3 +569,37 @@ def process_one_image(image, detector, model):
         keypoint_scores.append(keypoint_scores_i[0])  ## remove fake batch dim
 
     return keypoints, keypoint_scores, bboxes
+
+def aplly_seg_(img_np,mask,select_obj,RGB_BG):
+
+    #print(mask.shape) 1024*1024
+    sem_seg = np.array(mask)
+    num_classes = len(GOLIATH_CLASSES)
+    ids = np.unique(sem_seg)[::-1]
+    legal_indices = ids < num_classes
+    ids = ids[legal_indices]
+    overlay = np.zeros((*sem_seg.shape, 3), dtype=np.uint8)
+    empty_np = np.zeros_like(img_np.shape)
+    if select_obj:
+        labels_s = np.array(select_obj, dtype=np.int64)
+        colors_s = [GOLIATH_PALETTE[label] for label in labels_s]
+        for label, color in zip(labels_s, colors_s):
+            overlay[sem_seg == label, :] = color
+    else:
+        labels = np.array(ids, dtype=np.int64)
+        labels = labels[labels != 0]  # remove bg
+        colors = [GOLIATH_PALETTE[label] for label in labels]
+        for label, color in zip(labels, colors):
+            overlay[sem_seg == label, :] = color
+    x = np.uint8(empty_np + overlay)
+    seg_gray = cv2.cvtColor(x, cv2.COLOR_BGR2GRAY)
+    ret, mask_ = cv2.threshold(seg_gray, 0, 255, cv2.THRESH_BINARY)
+    img_np[mask_ == 0] = RGB_BG  # [255, 255, 255]
+    return np.uint8(img_np),mask_>0
+
+
+def aplly_seg_bg_color(image, mask, bg_color=[0, 0, 0]):
+    result = np.zeros_like(image)
+    result[mask] = image[mask]
+    result[~mask] = bg_color
+    return result
