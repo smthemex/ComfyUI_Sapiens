@@ -59,6 +59,7 @@ class ImageProcessor:
         mask = preds.squeeze(0).cpu().numpy()
         
         # Visualize the segmentation
+
         blended_image,blended_mask = self.visualize_pred_with_overlay(image, mask,select_obj,RGB_BG)
         
         return blended_image, blended_mask,preds
@@ -74,9 +75,20 @@ class ImageProcessor:
         ids = ids[legal_indices]
         overlay = np.zeros((*sem_seg.shape, 3), dtype=np.uint8)
         empty_np=np.zeros_like(img_np.shape)
-        if select_obj:
-            labels_s=np.array(select_obj,dtype=np.int64)
+        index=[]
+        for i in select_obj:
+            if i >2 :
+                i=i-1
+            if i==2:
+                continue
+            index.append(i)
+
+        if index:
+            labels_s=np.array(index,dtype=np.int64)
+
             colors_s=[GOLIATH_PALETTE[label] for label in labels_s]
+           
+
             for label, color in zip(labels_s, colors_s):
                 overlay[sem_seg == label, :] = color
         else:
@@ -91,11 +103,11 @@ class ImageProcessor:
         img_np[mask_ != 255] =RGB_BG #[255, 255, 255]
         blended_seg = np.uint8(img_np)
         blended_mask = get_mask(x.copy())
-        return Image.fromarray(blended_seg),blended_mask
+        return blended_seg,blended_mask
 
 
-def aplly_seg(img,preds,select_obj,RGB_BG):
-    img_np = np.array(img.convert("RGB"))
+def aplly_seg(img_np,preds,select_obj,RGB_BG):
+    #img_np = np.array(img.convert("RGB"))
     
     mask = preds.squeeze(0).cpu().numpy()
     sem_seg = np.array(mask)
@@ -105,8 +117,15 @@ def aplly_seg(img,preds,select_obj,RGB_BG):
     ids = ids[legal_indices]
     overlay = np.zeros((*sem_seg.shape, 3), dtype=np.uint8)
     empty_np = np.zeros_like(img_np.shape)
-    if select_obj:
-        labels_s = np.array(select_obj, dtype=np.int64)
+    index=[]
+    for i in select_obj:
+        if i >2 :
+            i=i-1
+        if i==2:
+            continue
+        index.append(i)
+    if index:
+        labels_s = np.array(index, dtype=np.int64)
         colors_s = [GOLIATH_PALETTE[label] for label in labels_s]
         for label, color in zip(labels_s, colors_s):
             overlay[sem_seg == label, :] = color
@@ -140,8 +159,8 @@ class ImageProcessorDepth:
         depth_colored = self.colorize_depth_map(depth_map)
         
         if if_seg:
-            depth_colored=aplly_seg(Image.fromarray(depth_colored),seg_in,select_obj,RGB_BG)
-        return Image.fromarray(depth_colored)
+            depth_colored=aplly_seg(cv2.cvtColor(depth_colored, cv2.COLOR_BGR2RGB),seg_in,select_obj,RGB_BG)
+        return depth_colored
     
     @staticmethod
     def colorize_depth_map(depth_map):
@@ -184,9 +203,9 @@ class ImageProcessorNormal:
         
         # Run segmentation
         if if_seg:
-            normal_map_vis=aplly_seg(Image.fromarray(normal_map_vis),seg_in,select_obj,RGB_BG)
+            normal_map_vis=aplly_seg(cv2.cvtColor(normal_map_vis, cv2.COLOR_BGR2RGB),seg_in,select_obj,RGB_BG)
         
-        return Image.fromarray(normal_map_vis)
+        return normal_map_vis
 
     @staticmethod
     def visualize_normal_map(normal_map):
@@ -221,7 +240,7 @@ def download_hf_model(model_name: str, task_type: TaskType, model_dir: str = 'mo
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    path = model_dir + f"/{task_type.value}/" + model_name
+    path = model_dir +  model_name
     if os.path.exists(path):
         return path
 
@@ -245,9 +264,9 @@ def download_hf_model(model_name: str, task_type: TaskType, model_dir: str = 'mo
     else:
         repo_id = f"facebook/sapiens-{task_type.value}-{model_version}-{dtype}"#bfloat16
         
-    real_dir=os.path.join(model_dir,f"{task_type.value}")
+    #real_dir=os.path.join(model_dir,f"{task_type.value}")
     
-    hf_hub_download(repo_id=repo_id, filename=model_name, local_dir=real_dir)
+    hf_hub_download(repo_id=repo_id, filename=model_name, local_dir=model_dir)
     print("Model downloaded successfully to", path)
     return path
 

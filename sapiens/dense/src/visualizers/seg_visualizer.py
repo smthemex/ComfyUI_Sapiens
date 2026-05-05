@@ -192,3 +192,4 @@ class SegVisualizer(nn.Module):
         cv2.imwrite(grid_out_file, grid_image)
 
         return
+

@@ -1,7 +1,2 @@
 __pycache__/
 *.pyc
-
-.pytest_cache/
-
-test_outputs/
-outputs/

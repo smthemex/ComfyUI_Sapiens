@@ -64,7 +64,7 @@ class SapiensPoseEstimation:
         # Initialize the YOLO-based detector
         self.detector = Detector()
 
-    def __call__(self, img: np.ndarray,filter_obj) -> (np.ndarray,):
+    def __call__(self, img: np.ndarray,filter_obj):
         start = time.perf_counter()
 
         # Detect persons in the image
@@ -101,7 +101,7 @@ class SapiensPoseEstimation:
         self.model.to("cuda")
 
     @torch.inference_mode()
-    def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]],filter_obj_done) -> (np.ndarray, List[dict],tuple):
+    def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]],filter_obj_done):
         all_keypoints = []
         result_img = img.copy()
 
@@ -119,7 +119,7 @@ class SapiensPoseEstimation:
                 result_img,box_size = self.draw_keypoints(empty_cv, keypoints, bbox,filter_obj_done)
             else:
                 # Draw the keypoints on the original image
-                result_img,box_size = self.draw_keypoints(result_img, keypoints, bbox,filter_obj_done)
+                result_img,box_size = self.draw_keypoints(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB), keypoints, bbox,filter_obj_done)
            
         return result_img, all_keypoints,box_size
 
@@ -138,7 +138,7 @@ class SapiensPoseEstimation:
         return keypoints
 
  
-    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float],filter_obj_done) ->(np.ndarray,tuple) :
+    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float],filter_obj_done):
         
         if filter_obj_done:
             get_list=[]

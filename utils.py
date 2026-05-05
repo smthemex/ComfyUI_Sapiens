@@ -19,16 +19,9 @@ cur_path = os.path.dirname(os.path.abspath(__file__))
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
 weigths_current_path = os.path.join(folder_paths.models_dir, "sapiens")
-weigths_seg_path= os.path.join(weigths_current_path, "seg")
-
-
 
 def get_path(path_name):
-    if path_name != "none":
-        path = folder_paths.get_full_path("sapiens", path_name)
-    else:
-        path = None
-    return path
+    return  folder_paths.get_full_path("sapiens", path_name) if path_name != "none" else None
 
 def get_models_path(seg_ckpt,depth_ckpt,normal_ckpt,pose_ckpt,config,dtype):
     seg_path = get_path(seg_ckpt)
@@ -37,22 +30,19 @@ def get_models_path(seg_ckpt,depth_ckpt,normal_ckpt,pose_ckpt,config,dtype):
     pose_path = get_path(pose_ckpt)
     
     if not seg_path and not depth_path and not depth_path and not pose_ckpt:
-        if len(os.listdir(weigths_seg_path)) > 1 and has_file_with_extension(weigths_seg_path):
-            raise "you need choice a checkpoints!"
+        logging.info(
+            f"No checkpoints in {weigths_current_path},will be auto downlaod defualt seg 1b checkpoints")
+        #defult torchscript version seg
+        seg_file_path=os.path.join(weigths_current_path,SapiensSegmentationType.SEGMENTATION_1B_T.value)
+        if not os.path.exists(seg_file_path):
+            config.local_seg_path = download_hf_model(SapiensSegmentationType.SEGMENTATION_1B_T.value,
+                                                        TaskType.SEG,
+                                                        weigths_current_path, dtype)
         else:
-            logging.info(
-                f"No checkpoints in {weigths_seg_path},will be auto downlaod defualt seg 1b checkpoints")
-            #defult torchscript version seg
-            seg_file_path=os.path.join(weigths_seg_path,SapiensSegmentationType.SEGMENTATION_1B_T.value)
-            if not os.path.exists(seg_file_path):
-                config.local_seg_path = download_hf_model(SapiensSegmentationType.SEGMENTATION_1B_T.value,
-                                                          TaskType.SEG,
-                                                          weigths_seg_path, dtype)
-            else:
-                config.local_seg_path= seg_file_path
-            config.segmentation_type = SapiensSegmentationType.SEGMENTATION_1B_T
-            config.use_torchscript=True
-            return config
+            config.local_seg_path= seg_file_path
+        config.segmentation_type = SapiensSegmentationType.SEGMENTATION_1B_T
+        config.use_torchscript=True
+        return config
     if seg_path:
         config.use_torchscript_seg = False
         if "1b" in seg_path:
