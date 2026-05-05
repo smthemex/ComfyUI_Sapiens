@@ -65,15 +65,15 @@ only support torchscript version now,you can choice 1b,0.3b,0.6b,2b,do not chang
 
 **seg body**    
 * sapiens2
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v2_n.png)
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v2_p.png)
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v2_s.png)
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v2_ps.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_n.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_p.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_s.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_ps.png)
 
 * sapiens1       
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v1.png)
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v1_p.png)
-![](https://github.com/smthemex/ComfyUI_Sapiens/tree/main/example_workflows/v1_s.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v1.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v1_p.png)
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v1_s.png)
 
 Citation
 ------
