@@ -13,6 +13,18 @@ from .albedo_transforms import (
     AlbedoResize,
     AlbedoResizePadImage,
 )
+from .matting_transforms import (
+    MattingCropAlphaBBox,
+    MattingPackInputs,
+    MattingPhotoMetricDistortion,
+    MattingRandomBackground,
+    MattingRandomCrop,
+    MattingRandomFlip,
+    MattingRandomJPEGCompression,
+    MattingRandomResize,
+    MattingRandomRotate,
+    MattingResize,
+)
 from .normal_transforms import (
     NormalGenerateTarget,
     NormalPackInputs,
@@ -74,4 +86,14 @@ __all__ = [
     "AlbedoRandomScale",
     "AlbedoResize",
     "AlbedoResizePadImage",
+    "MattingRandomFlip",
+    "MattingRandomCrop",
+    "MattingResize",
+    "MattingRandomResize",
+    "MattingRandomRotate",
+    "MattingPhotoMetricDistortion",
+    "MattingPackInputs",
+    "MattingRandomBackground",
+    "MattingCropAlphaBBox",
+    "MattingRandomJPEGCompression",
 ]

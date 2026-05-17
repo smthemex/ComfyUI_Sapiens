@@ -6,6 +6,7 @@ Sapiens2 From: [facebookresearch/sapiens2](https://github.com/facebookresearch/s
 
 Update
 ----
+* support matting now,支持matting模型，修复bf16格式错误；
 * clean up codes ,sapiens2 support body spilit now,清理代码，2代已支持身体部分分离,使用插件自带的split节点； 
 
 
@@ -65,6 +66,8 @@ only support torchscript version now,you can choice 1b,0.3b,0.6b,2b,do not chang
 
 **seg body**    
 * sapiens2
+
+![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_m.png)
 ![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_n.png)
 ![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_p.png)
 ![](https://github.com/smthemex/ComfyUI_Sapiens/blob/main/example_workflows/v2_s.png)

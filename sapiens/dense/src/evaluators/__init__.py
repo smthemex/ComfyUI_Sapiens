@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from .albedo_evaluator import AlbedoEvaluator
+from .matting_evaluator import MattingEvaluator
 from .normal_evaluator import NormalEvaluator
 from .pointmap_evaluator import PointmapEvaluator
 from .seg_evaluator import SegEvaluator
@@ -14,4 +15,5 @@ __all__ = [
     "SegEvaluator",
     "NormalEvaluator",
     "AlbedoEvaluator",
+    "MattingEvaluator",
 ]

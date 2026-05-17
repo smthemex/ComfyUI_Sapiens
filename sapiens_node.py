@@ -40,6 +40,7 @@ class SapiensLoader(io.ComfyNode):
                 io.Combo.Input("pose",options= ["none"] + [i for i in folder_paths.get_filename_list("sapiens") if "pose" in i or "goliath_AP" in i ] ),
                 io.Combo.Input("pointmap",options= ["none"] + [i for i in folder_paths.get_filename_list("sapiens") if "pointmap" in i ] ),
                 io.Combo.Input("albedo",options= ["none"] + [i for i in folder_paths.get_filename_list("sapiens") if "albedo" in i ] ),
+                io.Combo.Input("matting",options= ["none"] + [i for i in folder_paths.get_filename_list("sapiens") if "matting" in i ] ),
                 io.Combo.Input("dtype",options= [ "float32", "bfloat16",]),
                 io.Float.Input("mini_person_h", default=0.5, min=0.0, max=1.0,step=0.05,display_mode=io.NumberDisplay.number),
                 io.Boolean.Input("show_pose_object", default=False),
@@ -51,7 +52,7 @@ class SapiensLoader(io.ComfyNode):
                 ],
             )
     @classmethod
-    def execute(cls, seg,depth,normal,pose,pointmap,albedo,dtype,mini_person_h,show_pose_object,convert_torchscript,V2) -> io.NodeOutput:
+    def execute(cls, seg,depth,normal,pose,pointmap,albedo,matting,dtype,mini_person_h,show_pose_object,convert_torchscript,V2) -> io.NodeOutput:
         if dtype == "bfloat16":
             infer_dtype = torch.bfloat16
         else:
@@ -96,9 +97,10 @@ class SapiensLoader(io.ComfyNode):
             albedo_path = folder_paths.get_full_path("sapiens",albedo) if albedo != "none" else None
             pose_path = folder_paths.get_full_path("sapiens",pose) if pose != "none" else None
             pose_detector=Detector() if pose_path is not None else None
+            matting_path = folder_paths.get_full_path("sapiens",matting) if matting != "none" else None
             if pointmap_path is not None and seg_path is None:
                 raise("pointmap need segment model to get mask,please select a segment model")
-            model=Sapiens2Predictor(seg_path,pointmap_path,albedo_path,normal_path,pose_path,pose_detector,node_cr_path,device,infer_dtype)
+            model=Sapiens2Predictor(seg_path,pointmap_path,albedo_path,normal_path,pose_path,matting_path,pose_detector,node_cr_path,device,infer_dtype)
             model.load_model(torch.device("cpu")) # keep model on cpu
             model.remove_bg=True
             model.show_pose_object=show_pose_object
@@ -129,7 +131,9 @@ class SapiensSampler(io.ComfyNode):
                 io.Image.Output(display_name="normal_img"),
                 io.Image.Output(display_name="pointmap_img"),
                 io.Image.Output(display_name="albedo_img"),
+                io.Image.Output(display_name="matting_img"),
                 io.Mask.Output(display_name="mask"),
+                
             ],
         )
     @classmethod
@@ -137,7 +141,7 @@ class SapiensSampler(io.ComfyNode):
         start = time.perf_counter()
         zero_tensor = torch.zeros_like(image, dtype=torch.float32, device="cpu")
         image_list=[image] if image.size()[0] == 1 else torch.chunk(image, chunks=image.size()[0])
-        albedo_list,pointmap_list,depth_list=[],[],[]
+        albedo_list,pointmap_list,depth_list,matting_list=[],[],[],[]
         RGB_BG = [BG_R, BG_G, BG_B]
         cond=[] if not cond else cond
         print("start predict...")
@@ -155,7 +159,8 @@ class SapiensSampler(io.ComfyNode):
                     model.enable_model_cpu_offload()
         else:
             img_in = [tensor2cv(i.squeeze()) for i in image_list]
-            seg_list,normal_list,pointmap_list,albedo_list,pose_list,mask_list=model.predict(img_in,cond, RGB_BG)
+            seg_list,normal_list,pointmap_list,albedo_list,pose_list,matting_list,mask_list,matting_mask=model.predict(img_in,cond, RGB_BG)
+            mask_list=matting_mask if len(matting_mask)>0 else mask_list
             mask= torch.zeros((64, 64), dtype=torch.float32, device="cpu") if not mask_list  else torch.stack([torch.from_numpy(i).float() for i in mask_list], dim=0)
 
         depth_img = zero_tensor if not depth_list  else torch.cat(depth_list, dim=0)
@@ -164,13 +169,14 @@ class SapiensSampler(io.ComfyNode):
         normal_img=zero_tensor if not normal_list  else torch.cat(normal_list, dim=0)
         pointmap_img=zero_tensor if  not pointmap_list  else torch.cat(pointmap_list, dim=0)
         albedo_img=zero_tensor if not albedo_list  else torch.cat(albedo_list, dim=0)
+        matting_image=zero_tensor if not matting_list  else torch.cat(matting_list, dim=0)
 
         if pose_list and save_pose:
             print(f"pose counts is {len(pose_list)},Save pose as *.npy files in comfyUI output....")
             for i,img in enumerate(pose_list):
                 np.save(os.path.join(folder_paths.get_output_directory(),f"{i}"),tensor2cv(img))
         print(f"ALL inference took: {time.perf_counter() - start:.4f} seconds")
-        return io.NodeOutput(seg_img,pose_img, depth_img, normal_img,pointmap_img,albedo_img, mask)
+        return io.NodeOutput(seg_img,pose_img, depth_img, normal_img,pointmap_img,albedo_img,matting_image, mask )
 
 class SapiensSplit(io.ComfyNode):
     @classmethod

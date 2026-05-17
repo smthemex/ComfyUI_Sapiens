@@ -17,11 +17,12 @@ from .pose.src.datasets import parse_pose_metainfo, UDPHeatmap
 from .classes_and_palettes import GOLIATH_PALETTE, GOLIATH_CLASSES
 
 class Sapiens2Predictor:
-    def __init__(self,seg_path,pointmap_path,albedo_path,normal_path,pose_path,pose_detector,node_dir,device,dtype):
+    def __init__(self,seg_path,pointmap_path,albedo_path,normal_path,pose_path,matting_path,pose_detector,node_dir,device,dtype):
         self.seg_path=seg_path
         self.pointmap_path=pointmap_path
         self.albedo_path=albedo_path
         self.normal_path=normal_path
+        self.matting_path=matting_path
         self.node_dir=node_dir
         self.device=device
         self.use_pellete=False
@@ -44,15 +45,23 @@ class Sapiens2Predictor:
         self.model_albedo=load_model(self.albedo_path,self.node_dir,device,self.dtype) if self.albedo_path else None
         self.model_normal=load_model(self.normal_path,self.node_dir,device,self.dtype) if self.normal_path else None
         self.model_pose=load_model(self.pose_path,self.node_dir,device,self.dtype) if self.pose_path else None
+        self.model_matting=load_model(self.matting_path,self.node_dir,device,self.dtype) if self.matting_path else None
 
     def predict(self,image,cond, RGB_BG):
-        seg_img,normal_img,pointmap_img,albedo_img,mask_list,pose_img=[],[],[],[],[],[]
+        seg_img,normal_img,pointmap_img,albedo_img,mask_list,pose_img,matting_mask,matting_img=[],[],[],[],[],[],[],[]
         if self.model_seg:
             if self.load_device != self.device:# move to device
                 self.model_seg.to(self.device)
             seg_img,mask_list= seg_predict(self.model_seg,image,cond, RGB_BG,self.class_palette_type) # list ,list of labels
             self.model_seg.to(torch.device("cpu"))
             torch.cuda.empty_cache()
+        if  self.model_matting:
+            if self.load_device != self.device:# move to device
+                self.model_matting.to(self.device)
+            matting_img,matting_mask= matting_predict(self.model_matting,image,RGB_BG) # list ,list of labels
+            self.model_matting.to(torch.device("cpu"))
+            torch.cuda.empty_cache()
+        mask_list=mask_list if len(mask_list)>0 else matting_mask if len(matting_mask)>0 else []
         if self.model_pose:
             if self.load_device != self.device:# move to device
                 self.model_pose.to(self.device)
@@ -78,7 +87,7 @@ class Sapiens2Predictor:
         if self.model_pointmap:
             if self.load_device != self.device:# move to device
                 self.model_pointmap.to(self.device)
-            assert mask_list , "mask_list should not be [],you need load seg model first"
+            assert mask_list , "mask_list or matting_mask should not be [],you need load seg model or matting model to get the mask for pointmap prediction"
             pointmap_img=pointmap_predict(self.model_pointmap, image, mask_list,cond, RGB_BG,self.with_normal,self.no_black_background,self.no_save_predictions)
             self.model_pointmap.to(torch.device("cpu"))
         if self.model_albedo:
@@ -87,8 +96,64 @@ class Sapiens2Predictor:
             albedo_img=albedo_predict(self.model_albedo, image, mask_list,cond, RGB_BG,)
             self.model_albedo.to(torch.device("cpu"))
         
-        return seg_img,normal_img,pointmap_img,albedo_img,pose_img,mask_list
+        return seg_img,normal_img,pointmap_img,albedo_img,pose_img,matting_img,mask_list,matting_mask
 
+
+def matting_predict(model, images,RGB_BG):
+    # model = init_model(args.config, args.checkpoint, device=args.device)
+    mask_list=[]
+    matting_list=[]
+    for image in tqdm(images, total=len(images)):
+    #for image_path in tqdm(image_paths, total=len(image_paths)):
+        #image_name = os.path.basename(image_path)
+        #image = cv2.imread(image_path)  ## BGR
+        # if image is None:
+        #     raise FileNotFoundError(f"Could not read image: {image_path}")
+
+        ##------------------------------------------
+        data = model.pipeline(dict(img=image))  ## resize
+        data = model.data_preprocessor(data)  ## normalize, add batch dim and cast
+        inputs = data["inputs"]
+        inputs = inputs.to(next(model.parameters()).dtype)
+        with torch.no_grad():
+            outputs = model(inputs)  ## 1 x 4 x H x W: [fgr_rgb, alpha]
+
+        outputs = F.interpolate(
+            outputs,
+            size=(image.shape[0], image.shape[1]),
+            mode="bilinear",
+            align_corners=False,
+        )
+
+        outputs = outputs.squeeze(0).float().cpu().numpy()  ## 4 x H x W
+        fgr_rgb = outputs[0:3].clip(0, 1).transpose(1, 2, 0)  ## H x W x 3, RGB premult
+        alpha = outputs[3].clip(0, 1)  ## H x W
+        mask=(alpha > 0.05).astype(bool)
+        mask_list.append(mask)
+        
+        # ------------------------------------------
+        #alpha_vis = (alpha * 255).astype(np.uint8)
+        #alpha_vis_3ch = np.stack([alpha_vis] * 3, axis=-1)
+
+        # Composite the predicted (pre-multiplied) foreground over a chroma-green
+        # background.
+        fgr_bgr = fgr_rgb[:, :, ::-1]  ## RGB -> BGR
+        bg_bgr = np.array([RGB_BG[2], RGB_BG[1], RGB_BG[0]], dtype=np.float32) / 255.0  ## chroma green
+        composite = fgr_bgr + (1 - alpha[..., None]) * bg_bgr
+        composite = (composite.clip(0, 1) * 255).astype(np.uint8)
+
+        #vis_image = np.concatenate([image, alpha_vis_3ch, composite], axis=1)
+        vis_image=cv2.cvtColor(composite, cv2.COLOR_BGR2RGB)
+        image = torch.from_numpy(vis_image.astype(np.float32) / 255.0).unsqueeze(0)
+        matting_list.append(image)
+        #save_path = os.path.join(args.output, image_name)
+        #cv2.imwrite(save_path, vis_image)
+
+        # if save_pred:
+        #     base = os.path.splitext(image_name)[0]
+        #     np.save(os.path.join(args.output, f"{base}_alpha.npy"), alpha)
+
+    return  matting_list,mask_list
 
 def albedo_predict(model, images,mask_list,select_obj,RGB_BG,):
     image_list = []
@@ -101,7 +166,7 @@ def albedo_predict(model, images,mask_list,select_obj,RGB_BG,):
         data = model.pipeline(dict(img=image))  ## resize and pad
         data = model.data_preprocessor(data)  ## normalize, add batch dim and cast
         inputs, data_samples = data["inputs"], data["data_samples"]
-
+        inputs = inputs.to(next(model.parameters()).dtype)
         ## pointmap is 1 x 3 x H x W, scale is 1 x 1
         with torch.no_grad():
             albedo = model(inputs)
@@ -123,7 +188,7 @@ def albedo_predict(model, images,mask_list,select_obj,RGB_BG,):
             align_corners=False,
         )
 
-        albedo = albedo.squeeze(0).cpu().numpy().transpose(1, 2, 0)  ## H x W x 3
+        albedo = albedo.squeeze(0).cpu().float().numpy().transpose(1, 2, 0)  ## H x W x 3
         albedo = (albedo * 255).astype(np.uint8)
         albedo[mask == 0] = [100, 100, 100]
 
@@ -143,7 +208,7 @@ def seg_predict(model, images,cond, RGB_BG,class_palette_type="dome29"):
         data = model.pipeline(dict(img=image))  ## resize and pad
         data = model.data_preprocessor(data)  ## normalize, add batch dim and cast
         inputs = data["inputs"]
-
+        inputs = inputs.to(next(model.parameters()).dtype)
         ## pointmap is 1 x 3 x H x W, scale is 1 x 1
         with torch.no_grad():
             seg_logits = model(inputs)
@@ -152,7 +217,7 @@ def seg_predict(model, images,cond, RGB_BG,class_palette_type="dome29"):
         seg_logits = F.interpolate(
             seg_logits, size=image.shape[:2], mode="bilinear"
         )  ## 1 x C x H x W
-        pred_labels = seg_logits.argmax(dim=1).cpu().numpy()  ## 1 x H x W
+        pred_labels = seg_logits.argmax(dim=1).cpu().float().numpy()  ## 1 x H x W
         pred_labels = pred_labels.squeeze(0)  ## H x W
 
         vis_seg = visualizer._visualize_segmentation(image, pred_labels)
@@ -201,7 +266,7 @@ def pointmap_predict(model, images,mask_list,select_obj,RGB_BG,with_normal=False
         data = model.pipeline(dict(img=image))  ## resize and pad
         data = model.data_preprocessor(data)  ## normalize, add batch dim and cast
         inputs, data_samples = data["inputs"], data["data_samples"]
-
+        inputs = inputs.to(next(model.parameters()).dtype)
         ## pointmap is 1 x 3 x H x W, scale is 1 x 1
         with torch.no_grad():
             pointmap, scale = model(inputs)
@@ -229,7 +294,7 @@ def pointmap_predict(model, images,mask_list,select_obj,RGB_BG,with_normal=False
             target_width=mask.shape[1],
             smooth=True,
         )
-        pointmap = pointmap.squeeze(0).cpu().numpy().transpose(1, 2, 0)  ## H x W x 3
+        pointmap = pointmap.squeeze(0).cpu().float().numpy().transpose(1, 2, 0)  ## H x W x 3
 
         depth = pointmap[:, :, 2].astype(np.float32)
         #np.save(depth_npy_path, depth.astype(np.float16))
@@ -402,7 +467,7 @@ def normal_predict(model,images, mask_list,select_obj,RGB_BG,no_black_background
         data = model.pipeline(dict(img=image))  ## resize and pad
         data = model.data_preprocessor(data)  ## normalize, add batch dim and cast
         inputs, data_samples = data["inputs"], data["data_samples"]
-
+        inputs = inputs.to(next(model.parameters()).dtype)
         with torch.no_grad():
             normal = model(inputs)  # normal is 1 x 3 x H x W
             normal = normal / torch.norm(normal, dim=1, keepdim=True).clamp(
@@ -425,7 +490,7 @@ def normal_predict(model,images, mask_list,select_obj,RGB_BG,no_black_background
             align_corners=False,
         )
 
-        normal = normal.squeeze(0).cpu().numpy().transpose(1, 2, 0)  ## H x W x 3
+        normal = normal.squeeze(0).cpu().float().numpy().transpose(1, 2, 0)  ## H x W x 3
 
         normal[mask == 0] = -1
         normal_vis = ((normal + 1) / 2 * 255).astype(np.uint8)
@@ -456,7 +521,8 @@ def get_config_path(model_name,model_type,node_dir):
         "pointmap": "render_people",
         "albedo": "render_people",
         "normal": "metasim_render_people",
-        "pose": "metasim_render_people"
+        "pose": "metasim_render_people",
+        "matting": "gss_p3m_metasim",
         }
     
     if model_type!="pose":
@@ -539,6 +605,7 @@ def process_one_image(image, detector, model):
         data_samples_list.append(data["data_samples"])
 
     inputs = torch.cat(inputs_list, dim=0)  # B x 3 x H x W
+    inputs = inputs.to(next(model.parameters()).dtype)
     with torch.no_grad():
         pred = model(inputs)  # B x 3 x H x W
         if model.cfg.val_cfg is not None and model.cfg.val_cfg.get("flip_test", False):
@@ -550,7 +617,7 @@ def process_one_image(image, detector, model):
             pred = (pred + pred_flipped) / 2.0
 
     # ------------------------------------------
-    pred = pred.cpu().numpy()  ## B x K x heatmap_H x heatmap_W
+    pred = pred.cpu().float().numpy()  ## B x K x heatmap_H x heatmap_W
     keypoints = []
     keypoint_scores = []
     for i, data_samples in enumerate(data_samples_list):
