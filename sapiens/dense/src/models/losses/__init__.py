@@ -6,6 +6,7 @@
 
 from .albedo_loss import AlbedoGradL1Loss
 from .l1_loss import L1Loss
+from .matting_loss import MattingGradLoss, MattingL1Loss, MattingLaplacianLoss
 from .normal_loss import NormalCosineSimilarityLoss, NormalGradL1Loss
 from .pointmap_loss import (
     PointmapIntrinsicsConsistencyLoss,
@@ -28,4 +29,7 @@ __all__ = [
     "NormalCosineSimilarityLoss",
     "NormalGradL1Loss",
     "AlbedoGradL1Loss",
+    "MattingL1Loss",
+    "MattingGradLoss",
+    "MattingLaplacianLoss",
 ]

@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from .albedo_visualizer import AlbedoVisualizer
+from .matting_visualizer import MattingVisualizer
 from .normal_visualizer import NormalVisualizer
 from .pointmap_visualizer import PointmapVisualizer
 from .seg_visualizer import SegVisualizer
@@ -14,4 +15,5 @@ __all__ = [
     "SegVisualizer",
     "NormalVisualizer",
     "AlbedoVisualizer",
+    "MattingVisualizer",
 ]
